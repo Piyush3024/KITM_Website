@@ -1,0 +1,622 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model applications {
+  id                 Int    @id @default(autoincrement()) @db.UnsignedInt
+  application_number String @unique(map: "application_number") @db.VarChar(20)
+
+  // Personal Information
+  full_name      String                       @db.VarChar(100)
+  date_of_birth  DateTime                     @db.Date
+  gender         applications_gender
+  nationality    String?                      @default("Nepali") @db.VarChar(50)
+  religion       String?                      @db.VarChar(50)
+  blood_group    String?                      @db.VarChar(5)
+  marital_status applications_marital_status? @default(single)
+
+  // Contact Information
+  phone             String  @db.VarChar(20)
+  email             String  @db.VarChar(100)
+  permanent_address String  @db.Text
+  temporary_address String? @db.Text
+
+  // Family Information
+  father_name  String? @db.VarChar(100)
+  father_phone String? @db.VarChar(20)
+  mother_name  String? @db.VarChar(100)
+  mother_phone String? @db.VarChar(20)
+
+  // Program Information
+  program_applied String @db.VarChar(50)
+
+  // Application Status & Process
+  status                   applications_status? @default(draft)
+  entrance_test_rollNumber String?              @db.VarChar(20)
+  entrance_test_date       DateTime?            @db.Date
+  entrance_test_score      Decimal?             @db.Decimal(5, 2)
+
+  // Agreements
+  declaration_agreed Boolean @default(false)
+  terms_agreed       Boolean @default(false)
+
+  // Admin Fields
+  admin_notes      String?   @db.Text
+  rejection_reason String?   @db.Text
+  reviewed_by      Int?      @db.UnsignedInt
+  reviewed_at      DateTime? @db.Timestamp(0)
+
+  // Audit Fields
+  created_at DateTime  @default(now()) @db.Timestamp(0)
+  deleted_at DateTime? @db.Timestamp(0)
+
+  // Relations
+  education_records education_records[]
+  documents         application_documents[]
+  status_history    application_status_history[]
+  reviewer          users?                       @relation("applications_reviewed_by", fields: [reviewed_by], references: [id])
+
+  @@index([created_at(sort: Desc)], map: "idx_created_at")
+  @@index([email], map: "idx_email")
+  @@index([phone], map: "idx_phone")
+  @@index([status, program_applied], map: "idx_status_program")
+  @@index([deleted_at], map: "idx_deleted_at")
+}
+
+model education_records {
+  id             Int             @id @default(autoincrement()) @db.UnsignedInt
+  application_id Int             @db.UnsignedInt
+  level          education_level
+  board          String?         @db.VarChar(100)
+  institution    String?         @db.VarChar(200)
+  year_completed Int?            @db.Year
+  division       String?         @db.VarChar(20)
+  percentage     Decimal?        @db.Decimal(5, 2)
+  cgpa           Decimal?        @db.Decimal(4, 2)
+  is_verified    Boolean         @default(false)
+  created_at     DateTime        @default(now()) @db.Timestamp(0)
+
+  applications applications @relation(fields: [application_id], references: [id], onDelete: Cascade)
+
+  @@index([application_id], map: "idx_application_id")
+  @@index([level], map: "idx_level")
+}
+
+model application_documents {
+  id               Int           @id @default(autoincrement()) @db.UnsignedInt
+  application_id   Int           @db.UnsignedInt
+  document_type    document_type
+  original_name    String        @db.VarChar(255)
+  file_name        String        @db.VarChar(255)
+  file_path        String        @db.VarChar(500)
+  file_size        Int           @db.UnsignedInt
+  mime_type        String        @db.VarChar(100)
+  is_required      Boolean       @default(true)
+  is_submitted     Boolean       @default(false)
+  is_verified      Boolean       @default(false)
+  verified_by      Int?          @db.UnsignedInt
+  verified_at      DateTime?     @db.Timestamp(0)
+  rejection_reason String?       @db.Text
+  uploaded_at      DateTime      @default(now()) @db.Timestamp(0)
+
+  applications applications @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  verifier     users?       @relation("document_verified_by", fields: [verified_by], references: [id])
+
+  @@index([application_id], map: "idx_application_id")
+  @@index([document_type], map: "idx_document_type")
+  @@index([is_verified], map: "idx_is_verified")
+}
+
+model application_status_history {
+  id             Int                  @id @default(autoincrement()) @db.UnsignedInt
+  application_id Int                  @db.UnsignedInt
+  from_status    applications_status?
+  to_status      applications_status
+  changed_by     Int?                 @db.UnsignedInt
+  reason         String?              @db.Text
+  notes          String?              @db.Text
+  created_at     DateTime             @default(now()) @db.Timestamp(0)
+
+  applications applications @relation(fields: [application_id], references: [id], onDelete: Cascade)
+  user         users?       @relation("status_changed_by", fields: [changed_by], references: [id])
+
+  @@index([application_id], map: "idx_application_id")
+  @@index([created_at], map: "idx_created_at")
+}
+
+// Enhanced Posts with comprehensive SEO
+model posts {
+  id             Int     @id @default(autoincrement()) @db.UnsignedInt
+  title          String  @db.VarChar(255)
+  slug           String  @unique(map: "slug") @db.VarChar(255)
+  content        String  @db.LongText
+  excerpt        String? @db.Text
+  featured_image String? @db.VarChar(255)
+
+  // Basic SEO
+  meta_title       String? @db.VarChar(60)
+  meta_description String? @db.VarChar(160)
+
+  status       posts_status    @default(draft)
+  post_type    posts_post_type @default(blog)
+  is_featured  Boolean         @default(false)
+  view_count   Int?            @default(0) @db.UnsignedInt
+  author_id    Int             @db.UnsignedInt
+  published_at DateTime?       @db.Timestamp(0)
+  created_at   DateTime        @default(now()) @db.Timestamp(0)
+  updated_at   DateTime        @default(now()) @db.Timestamp(0)
+
+  users users @relation(fields: [author_id], references: [id], map: "fk_posts_author")
+
+  @@index([author_id], map: "fk_posts_author_idx")
+  @@index([is_featured], map: "idx_featured")
+  @@index([post_type], map: "idx_post_type")
+  @@index([status, published_at(sort: Desc)], map: "idx_status_published")
+}
+
+// Enhanced Pages with SEO
+model pages {
+  id             Int     @id @default(autoincrement()) @db.UnsignedInt
+  title          String  @db.VarChar(255)
+  slug           String  @unique(map: "slug") @db.VarChar(255)
+  content        String? @db.LongText
+  excerpt        String? @db.Text
+  featured_image String? @db.VarChar(255)
+
+  // Basic SEO
+  meta_title       String? @db.VarChar(60)
+  meta_description String? @db.VarChar(160)
+
+  // Page specific
+  template_type String? @default("default") @db.VarChar(50)
+  is_published  Boolean @default(true)
+  sort_order    Int?    @default(0)
+
+  created_by Int      @db.UnsignedInt
+  updated_by Int?     @db.UnsignedInt
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  updated_at DateTime @default(now()) @db.Timestamp(0)
+
+  users_pages_created_byTousers users  @relation("pages_created_byTousers", fields: [created_by], references: [id], map: "fk_pages_created_by")
+  users_pages_updated_byTousers users? @relation("pages_updated_byTousers", fields: [updated_by], references: [id], map: "fk_pages_updated_by")
+
+  @@index([created_by], map: "fk_pages_created_by_idx")
+  @@index([updated_by], map: "fk_pages_updated_by_idx")
+  @@index([slug, is_published], map: "idx_slug_published")
+}
+
+model settings {
+  id            Int                    @id @default(autoincrement()) @db.UnsignedInt
+  setting_key   String                 @unique(map: "setting_key") @db.VarChar(100)
+  setting_value String?                @db.LongText
+  setting_type  settings_setting_type? @default(text)
+  group_name    String?                @default("general") @db.VarChar(50)
+  label         String?                @db.VarChar(100)
+  description   String?                @db.Text
+  placeholder   String?                @db.VarChar(255) // For form inputs
+  validation    Json? // Validation rules
+  options       Json? // For select/radio inputs
+  is_public     Boolean?               @default(false)
+  is_required   Boolean?               @default(false)
+  sort_order    Int?                   @default(0)
+  created_at    DateTime               @default(now()) @db.Timestamp(0)
+  updated_at    DateTime               @default(now()) @db.Timestamp(0)
+
+  @@index([group_name, is_public], map: "idx_group_public")
+  @@index([sort_order], map: "idx_sort_order")
+}
+
+enum education_level {
+  slc_see
+  plus2_intermediate
+  bachelor
+  master
+  phd
+  diploma
+  certificate
+}
+
+enum document_type {
+  photo
+  citizenship
+  slc_certificate
+  plus2_certificate
+  plus2_transcript
+  bachelor_certificate
+  bachelor_transcript
+  character_certificate
+  migration_certificate
+  medical_certificate
+  other
+}
+
+enum applications_status {
+  draft
+  submitted
+  under_review
+  document_verification
+  provisionally_selected
+  enrollment_completed
+  rejected
+  cancelled
+  waitlisted
+}
+
+model users {
+  id                     Int        @id @default(autoincrement()) @db.UnsignedInt
+  username               String     @unique(map: "username") @db.VarChar(50)
+  email                  String     @unique(map: "User_email_key") @db.VarChar(100)
+  password               String     @db.VarChar(255)
+  role                   users_role @default(author)
+  isTemporaryPassword    Boolean    @default(false)
+  password_reset_token   String?    @db.Text
+  password_reset_expires DateTime?
+  is_active              Boolean    @default(true)
+  last_login             DateTime?  @db.Timestamp(0)
+  created_at             DateTime   @default(now()) @db.Timestamp(0)
+  updated_at             DateTime   @default(now()) @db.Timestamp(0)
+
+  // Existing relations
+  events_events_created_byTousers events[]       @relation("events_created_byTousers")
+  events_events_updated_byTousers events[]       @relation("events_updated_byTousers")
+  galleries                       galleries[]
+  media                           media[]
+  notices                         notices[]
+  pages_pages_created_byTousers   pages[]        @relation("pages_created_byTousers")
+  pages_pages_updated_byTousers   pages[]        @relation("pages_updated_byTousers")
+  posts                           posts[]
+  testimonials                    testimonials[]
+
+  // New relations
+  reviewed_applications applications[]               @relation("applications_reviewed_by")
+  verified_documents    application_documents[]      @relation("document_verified_by")
+  status_changes        application_status_history[] @relation("status_changed_by")
+
+  @@index([role, is_active], map: "idx_role_active")
+}
+
+model contact_inquiries {
+  id           Int                             @id @default(autoincrement()) @db.UnsignedInt
+  full_name    String                          @db.VarChar(100)
+  email        String                          @db.VarChar(100)
+  phone        String?                         @db.VarChar(20)
+  subject      String?                         @db.VarChar(200)
+  message      String                          @db.Text
+  inquiry_type contact_inquiries_inquiry_type? @default(general)
+  status       contact_inquiries_status?       @default(new)
+  response     String?                         @db.Text
+  responded_at DateTime?                       @db.Timestamp(0)
+  ip_address   String?                         @db.VarChar(45)
+  user_agent   String?                         @db.Text
+  created_at   DateTime                        @default(now()) @db.Timestamp(0)
+  updated_at   DateTime                        @default(now()) @db.Timestamp(0)
+
+  @@index([created_at(sort: Desc)], map: "idx_created_at")
+  @@index([status, inquiry_type], map: "idx_status_type")
+}
+
+model events {
+  id                             Int                @id @default(autoincrement()) @db.UnsignedInt
+  title                          String             @db.VarChar(255)
+  slug                           String             @unique(map: "slug") @db.VarChar(255)
+  description                    String             @db.LongText
+  excerpt                        String?            @db.Text
+  featured_image                 String?            @db.VarChar(255)
+  start_date                     DateTime           @db.Date
+  end_date                       DateTime?          @db.Date
+  start_time                     DateTime?          @db.Time(0)
+  end_time                       DateTime?          @db.Time(0)
+  location                       String?            @db.VarChar(255)
+  event_type                     events_event_type? @default(other)
+  registration_required          Boolean?           @default(false)
+  registration_link              String?            @db.VarChar(500)
+  is_published                   Boolean            @default(false)
+  is_featured                    Boolean            @default(false)
+  view_count                     Int?               @default(0) @db.UnsignedInt
+  created_by                     Int                @db.UnsignedInt
+  updated_by                     Int?               @db.UnsignedInt
+  published_at                   DateTime?          @db.Timestamp(0)
+  created_at                     DateTime           @default(now()) @db.Timestamp(0)
+  updated_at                     DateTime           @default(now()) @db.Timestamp(0)
+  users_events_created_byTousers users              @relation("events_created_byTousers", fields: [created_by], references: [id], map: "fk_events_created_by")
+  users_events_updated_byTousers users?             @relation("events_updated_byTousers", fields: [updated_by], references: [id], map: "fk_events_updated_by")
+
+  @@index([created_by], map: "fk_events_created_by_idx")
+  @@index([updated_by], map: "fk_events_updated_by")
+  @@index([event_type], map: "idx_event_type")
+  @@index([is_featured], map: "idx_featured")
+  @@index([start_date, is_published], map: "idx_start_date_published")
+}
+
+model faculty {
+  id               Int      @id @default(autoincrement()) @db.UnsignedInt
+  full_name        String   @db.VarChar(100)
+  designation      String?  @db.VarChar(100)
+  department       String?  @db.VarChar(100)
+  qualification    String?  @db.Text
+  specialization   String?  @db.Text
+  experience_years Int?     @db.UnsignedInt
+  bio              String?  @db.Text
+  profile_image    String?  @db.VarChar(255)
+  email            String?  @db.VarChar(100)
+  phone            String?  @db.VarChar(20)
+  social_links     Json?
+  is_active        Boolean  @default(true)
+  is_featured      Boolean  @default(false)
+  sort_order       Int?     @default(0)
+  created_at       DateTime @default(now()) @db.Timestamp(0)
+  updated_at       DateTime @default(now()) @db.Timestamp(0)
+
+  @@index([is_active, is_featured], map: "idx_active_featured")
+  @@index([department], map: "idx_department")
+}
+
+model galleries {
+  id            Int             @id @default(autoincrement()) @db.UnsignedInt
+  title         String          @db.VarChar(255)
+  slug          String          @unique(map: "slug") @db.VarChar(255)
+  description   String?         @db.Text
+  cover_image   String?         @db.VarChar(255)
+  is_active     Boolean         @default(true)
+  is_featured   Boolean         @default(false)
+  sort_order    Int?            @default(0)
+  created_by    Int             @db.UnsignedInt
+  updated_by    Int?            @db.UnsignedInt
+  created_at    DateTime        @default(now()) @db.Timestamp(0)
+  updated_at    DateTime        @default(now()) @db.Timestamp(0)
+  users         users           @relation(fields: [created_by], references: [id], map: "fk_galleries_created_by")
+  gallery_items gallery_items[]
+
+  @@index([created_by], map: "fk_galleries_created_by")
+  @@index([is_active, is_featured], map: "idx_active_featured")
+}
+
+model gallery_items {
+  id         Int       @id @default(autoincrement()) @db.UnsignedInt
+  gallery_id Int       @db.UnsignedInt
+  media_id   Int       @db.UnsignedInt
+  caption    String?   @db.VarChar(500)
+  sort_order Int?      @default(0)
+  created_at DateTime  @default(now()) @db.Timestamp(0)
+  galleries  galleries @relation(fields: [gallery_id], references: [id], onDelete: Cascade, map: "fk_gallery_items_gallery")
+  media      media     @relation(fields: [media_id], references: [id], onDelete: Cascade, map: "fk_gallery_items_media")
+
+  @@index([media_id], map: "fk_gallery_items_media")
+  @@index([gallery_id, sort_order], map: "idx_gallery_sort")
+}
+
+model media {
+  id            Int              @id @default(autoincrement()) @db.UnsignedInt
+  original_name String           @db.VarChar(255)
+  filename      String           @db.VarChar(255)
+  file_path     String           @db.VarChar(500)
+  file_size     Int              @db.UnsignedInt
+  mime_type     String           @db.VarChar(100)
+  file_type     media_file_type? @default(other)
+  alt_text      String?          @db.VarChar(255)
+  caption       String?          @db.Text
+  uploaded_by   Int              @db.UnsignedInt
+  created_at    DateTime         @default(now()) @db.Timestamp(0)
+  gallery_items gallery_items[]
+  users         users            @relation(fields: [uploaded_by], references: [id], map: "fk_media_uploaded_by")
+
+  @@index([file_type], map: "idx_file_type")
+  @@index([uploaded_by], map: "idx_uploaded_by")
+}
+
+model notices {
+  id           Int                 @id @default(autoincrement()) @db.UnsignedInt
+  title        String              @db.VarChar(255)
+  slug         String              @unique(map: "slug") @db.VarChar(255)
+  content      String              @db.LongText
+  excerpt      String?             @db.Text
+  notice_type  notices_notice_type @default(general)
+  priority     notices_priority    @default(normal)
+  attachment   String?             @db.VarChar(255)
+  is_published Boolean             @default(false)
+  is_featured  Boolean             @default(false)
+  valid_from   DateTime?           @db.Date
+  valid_until  DateTime?           @db.Date
+  view_count   Int?                @default(0) @db.UnsignedInt
+  author_id    Int                 @db.UnsignedInt
+  published_at DateTime?           @db.Timestamp(0)
+  created_at   DateTime            @default(now()) @db.Timestamp(0)
+  updated_at   DateTime            @default(now()) @db.Timestamp(0)
+  users        users               @relation(fields: [author_id], references: [id], map: "fk_notices_author")
+
+  @@index([author_id], map: "fk_notices_author_idx")
+  @@index([notice_type, is_published], map: "idx_notice_type_published")
+  @@index([priority, is_published], map: "idx_priority_published")
+  @@index([published_at(sort: Desc)], map: "idx_published_at")
+  @@index([valid_from, valid_until], map: "idx_valid_dates")
+}
+
+model partners {
+  id               Int                        @id @default(autoincrement()) @db.UnsignedInt
+  company_name     String                     @db.VarChar(100)
+  logo             String?                    @db.VarChar(255)
+  website_url      String?                    @db.VarChar(255)
+  partnership_type partners_partnership_type? @default(general)
+  description      String?                    @db.Text
+  contact_person   String?                    @db.VarChar(100)
+  contact_email    String?                    @db.VarChar(100)
+  contact_phone    String?                    @db.VarChar(20)
+  partnership_date DateTime?                  @db.Date
+  is_active        Boolean                    @default(true)
+  is_featured      Boolean                    @default(false)
+  sort_order       Int?                       @default(0)
+  created_at       DateTime                   @default(now()) @db.Timestamp(0)
+  updated_at       DateTime                   @default(now()) @db.Timestamp(0)
+
+  @@index([is_active, is_featured], map: "idx_active_featured")
+  @@index([partnership_type], map: "idx_partnership_type")
+}
+
+model programs {
+  id                    Int                   @id @default(autoincrement()) @db.UnsignedInt
+  name                  String                @db.VarChar(100)
+  code                  String                @unique(map: "code") @db.VarChar(20)
+  slug                  String                @unique(map: "slug") @db.VarChar(100)
+  short_description     String?               @db.Text
+  full_description      String?               @db.LongText
+  duration              String?               @db.VarChar(50)
+  degree_type           programs_degree_type? @default(bachelor)
+  affiliated_university String?               @db.VarChar(100)
+  total_seats           Int?                  @db.UnsignedInt
+  eligibility_criteria  String?               @db.Text
+  career_prospects      String?               @db.Text
+  featured_image        String?               @db.VarChar(255)
+  brochure_file         String?               @db.VarChar(255)
+  tuition_fee           Decimal?              @db.Decimal(10, 2)
+  is_active             Boolean               @default(true)
+  is_featured           Boolean               @default(false)
+  sort_order            Int?                  @default(0)
+  created_at            DateTime              @default(now()) @db.Timestamp(0)
+  updated_at            DateTime              @default(now()) @db.Timestamp(0)
+  testimonials          testimonials[]
+
+  @@index([is_active, is_featured], map: "idx_active_featured")
+  @@index([degree_type], map: "idx_degree_type")
+}
+
+/// This table contains check constraints and requires additional setup for migrations. Visit https://pris.ly/d/check-constraints for more info.
+model testimonials {
+  id               Int       @id @default(autoincrement()) @db.UnsignedInt
+  student_name     String    @db.VarChar(100)
+  program_id       Int?      @db.UnsignedInt
+  program_name     String?   @db.VarChar(100)
+  slug             String    @unique(map: "slug") @db.VarChar(100)
+  graduation_year  Int?      @db.Year
+  current_position String?   @db.VarChar(100)
+  company          String?   @db.VarChar(100)
+  content          String    @db.Text
+  rating           Int?      @db.UnsignedTinyInt
+  student_image    String?   @db.VarChar(255)
+  video_file       String?   @db.VarChar(255)
+  is_published     Boolean   @default(false)
+  is_featured      Boolean   @default(false)
+  sort_order       Int?      @default(0)
+  created_by       Int?      @db.UnsignedInt
+  updated_by       Int?      @db.UnsignedInt
+  created_at       DateTime  @default(now()) @db.Timestamp(0)
+  updated_at       DateTime  @default(now()) @db.Timestamp(0)
+  users            users?    @relation(fields: [created_by], references: [id], map: "fk_testimonials_created_by")
+  programs         programs? @relation(fields: [program_id], references: [id], map: "fk_testimonials_program")
+
+  @@index([created_by], map: "fk_testimonials_created_by_idx")
+  @@index([program_id], map: "fk_testimonials_program_idx")
+  @@index([program_id], map: "idx_program_id")
+  @@index([is_published, is_featured], map: "idx_published_featured")
+}
+
+enum settings_setting_type {
+  text
+  number
+  boolean
+  json
+  file
+  email
+  url
+}
+
+enum users_role {
+  admin
+  author
+}
+
+enum applications_gender {
+  male
+  female
+  other
+}
+
+enum partners_partnership_type {
+  internship
+  placement
+  training
+  research
+  mou
+  general
+}
+
+enum notices_notice_type {
+  general
+  academic
+  exam
+  admission
+  result
+  event
+  urgent
+}
+
+enum contact_inquiries_inquiry_type {
+  admission
+  general
+  complaint
+  suggestion
+  partnership
+  technical
+}
+
+enum media_file_type {
+  image
+  document
+  video
+  audio
+  other
+}
+
+enum notices_priority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum contact_inquiries_status {
+  new
+  in_progress
+  resolved
+  closed
+}
+
+enum programs_degree_type {
+  bachelor
+  master
+  diploma
+  certificate
+}
+
+enum applications_marital_status {
+  single
+  married
+  divorced
+  widowed
+}
+
+enum posts_status {
+  draft
+  published
+  archived
+}
+
+enum posts_post_type {
+  blog
+  news
+  announcement
+}
+
+enum events_event_type {
+  seminar
+  workshop
+  conference
+  cultural
+  sports
+  graduation
+  other
+}
