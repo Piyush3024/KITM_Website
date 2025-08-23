@@ -43,6 +43,12 @@ export const createEvent = async (req, res) => {
             is_featured = false,
         } = req.body;
 
+        const isPublished = is_published === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
+        const registrationRequired = registration_required === "true" ? true : false;
+        
+
+
         // Check for existing slug
         const existing = await prisma.events.findFirst({
             where: { slug: req.body.slug || (await generateSlug(title, prisma)) },
@@ -87,14 +93,15 @@ export const createEvent = async (req, res) => {
                 excerpt,
                 event_type,
                 start_date: start_date ? new Date(start_date) : null,
+                // start_date: start_date ? new Date(start_date) : null,
                 end_date: end_date ? new Date(end_date) : null,
                 start_time: start_time ? start_time : null,
                 end_time: end_time ? end_time : null,
                 location,
-                registration_required,
+                registration_required: registrationRequired,
                 registration_link,
-                is_published,
-                is_featured,
+                is_published: isPublished,
+                is_featured: isFeatured,
                 featured_image: finalFeaturedImagePath,
                 view_count: 0,
                 created_by: req.user.id,
@@ -125,7 +132,7 @@ export const createEvent = async (req, res) => {
                 registration_link: event.registration_link,
                 is_published: event.is_published,
                 is_featured: event.is_featured,
-                featured_image: featuredImageUrl,
+                featured_image: event.featured_image ? generateFileUrl(req, event.featured_image) : null,
                 view_count: event.view_count,
                 created_by: encodeId(event.created_by),
                 updated_by: encodeId(event.updated_by),
@@ -168,12 +175,12 @@ export const getEventByIdOrSlug = async (req, res) => {
             });
         }
 
-        if (!isAuthenticated && !event.is_published) {
-            return res.status(403).json({
-                success: false,
-                message: "Event is not published",
-            });
-        }
+        // if (!isAuthenticated && !event.is_published) {
+        //     return res.status(403).json({
+        //         success: false,
+        //         message: "Event is not published",
+        //     });
+        // }
 
         if (!req.user || !["admin", "author"].includes(req.user.role)) {
             await prisma.events.update({
@@ -238,7 +245,7 @@ export const getAllEvents = async (req, res) => {
 
         const where = {};
         if (event_type) where.event_type = event_type;
-        if (!isAuthenticated) ;
+        if (!isAuthenticated);
 
         const [events, total] = await Promise.all([
             prisma.events.findMany({
@@ -306,7 +313,8 @@ export const getAllPublishedEvents = async (req, res) => {
             is_featured,
         } = req.query;
         const isAuthenticated = !!req.user;
-
+        const isPublished = is_published === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
 
@@ -390,6 +398,9 @@ export const updateEvent = async (req, res) => {
         } = req.body;
         const decodedId = decodeId(id);
 
+        const isPublished = is_published === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
+
         const existingEvent = await prisma.events.findUnique({
             where: { id: decodedId },
         });
@@ -417,7 +428,7 @@ export const updateEvent = async (req, res) => {
 
         // Handle file uploads - Check multiple sources with debugging
         let newFeaturedImagePath = null;
-        
+
         // Check if there's a single file upload
         if (req.file && req.file.fieldname === 'featured_image') {
             newFeaturedImagePath = req.file.path;
@@ -435,7 +446,7 @@ export const updateEvent = async (req, res) => {
                 }
             }
         }
-        
+
         // Fallback to handleLocalFileUploads if above didn't work
         if (!newFeaturedImagePath) {
             const uploadedFiles = handleLocalFileUploads(req);
@@ -455,10 +466,10 @@ export const updateEvent = async (req, res) => {
             start_time: start_time ? start_time : undefined,
             end_time: end_time ? end_time : undefined,
             location,
-            registration_required,
+            registration_required: registration_required === "true" ? true : false,
             registration_link,
-            is_published,
-            is_featured,
+            is_published: isPublished,
+            is_featured: isFeatured,
             updated_by: req.user.id,
             updated_at: new Date(),
             published_at: is_published ? (existingEvent.is_published ? existingEvent.published_at : new Date()) : null,
@@ -527,123 +538,6 @@ export const updateEvent = async (req, res) => {
     }
 };
 
-// export const updateEvent = async (req, res) => {
-//     try {
-//         const { id } = req.params;
-//         const {
-//             title,
-//             description,
-//             excerpt,
-//             event_type,
-//             start_date,
-//             end_date,
-//             start_time,
-//             end_time,
-//             location,
-//             registration_required,
-//             registration_link,
-//             is_published,
-//             is_featured,
-//         } = req.body;
-//         const decodedId = decodeId(id);
-
-//         const existingEvent = await prisma.events.findUnique({
-//             where: { id: decodedId },
-//         });
-
-//         if (!existingEvent) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "Event not found",
-//             });
-//         }
-
-//         const existing = await prisma.events.findFirst({
-//             where: {
-//                 slug: req.body.slug || (title ? await generateSlug(title, prisma, decodedId) : existingEvent.slug),
-//                 NOT: { id: decodedId },
-//             },
-//         });
-
-//         if (existing) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Event slug already exists",
-//             });
-//         }
-
-//         const uploadedFiles = handleLocalFileUploads(req);
-//         const updateData = {
-//             title,
-//             description,
-//             excerpt,
-//             event_type,
-//             start_date: start_date ? new Date(start_date) : undefined,
-//             end_date: end_date ? new Date(end_date) : undefined,
-//             start_time: start_time ? start_time : undefined,
-//             end_time: end_time ? end_time : undefined,
-//             location,
-//             registration_required,
-//             registration_link,
-//             is_published,
-//             is_featured,
-//             updated_by: req.user.id,
-//             published_at: is_published ? (existingEvent.is_published ? existingEvent.published_at : new Date()) : null,
-//         };
-
-//         if (uploadedFiles.featured_image) {
-//             if (existingEvent.featured_image) {
-//                 await deleteFile(existingEvent.featured_image);
-//             }
-//             updateData.featured_image = uploadedFiles.featured_image;
-//         }
-
-//         const event = await prisma.events.update({
-//             where: { id: decodedId },
-//             data: {
-//                 ...updateData,
-//                 slug: req.body.slug || (title ? await generateSlug(title, prisma, decodedId) : undefined),
-//             },
-//         });
-
-//         res.json({
-//             success: true,
-//             message: "Event updated successfully",
-//             data: {
-//                 id: encodeId(event.id),
-//                 title: event.title,
-//                 slug: event.slug,
-//                 description: event.description,
-//                 excerpt: event.excerpt,
-//                 event_type: event.event_type,
-//                 start_date: event.start_date,
-//                 end_date: event.end_date,
-//                 start_time: event.start_time,
-//                 end_time: event.end_time,
-//                 location: event.location,
-//                 registration_required: event.registration_required,
-//                 registration_link: event.registration_link,
-//                 is_published: event.is_published,
-//                 is_featured: event.is_featured,
-//                 featured_image: event.featured_image ? generateFileUrl(req, event.featured_image) : null,
-//                 view_count: event.view_count,
-//                 created_by: encodeId(event.created_by),
-//                 updated_by: encodeId(event.updated_by),
-//                 published_at: event.published_at,
-//                 created_at: event.created_at,
-//                 updated_at: event.updated_at,
-//             },
-//         });
-//     } catch (error) {
-//         console.error("Error in updateEvent controller:", error);
-//         res.status(500).json({
-//             success: false,
-//             message: "Error updating event",
-//             error: error.message,
-//         });
-//     }
-// };
-
 export const deleteEvent = async (req, res) => {
     try {
         const { id } = req.params;
@@ -694,7 +588,7 @@ export const searchEvents = async (req, res) => {
             is_published,
         } = req.query;
         const isAuthenticated = !!req.user;
-
+        const isPublished = is_published === "true" ? true : false;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
 
@@ -914,7 +808,8 @@ export const getEventByType = async (req, res) => {
             is_featured,
         } = req.query;
         const isAuthenticated = !!req.user;
-
+        const isPublished = is_published === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
         if (!event_type) {
             return res.status(400).json({
                 success: false,
@@ -988,6 +883,53 @@ export const getEventByType = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error retrieving events by type",
+            error: error.message,
+        });
+    }
+};
+
+
+export const checkSlugUniqueness = async (req, res) => {
+    try {
+
+        const { slug: providedSlug } = req.params;
+        const { excludeId: encodedEventId } = req.query;
+
+        let slugToCheck = providedSlug;
+
+        // If no slug provided, generate from title
+
+        if (!slugToCheck) {
+            return res.status(400).json({
+                success: false,
+                message: "Slug  is required",
+            });
+        }
+
+        // Decode pageId if updating (to exclude current page from uniqueness check)
+        const decodedEventId = encodedEventId ? decodeId(encodedEventId) : null;
+
+        // Check if any other page uses this slug
+        const existingEvent = await prisma.events.findFirst({
+            where: {
+                slug: slugToCheck,
+                NOT: decodedEventId ? { id: decodedEventId } : undefined,
+            },
+        });
+
+        res.json({
+            success: true,
+            isUnique: !existingEvent,
+            slug: slugToCheck,
+            message: existingEvent
+                ? "Slug is already in use"
+                : "Slug is available",
+        });
+    } catch (error) {
+        console.error("Error in checkSlugUniqueness controller:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error checking slug uniqueness",
             error: error.message,
         });
     }

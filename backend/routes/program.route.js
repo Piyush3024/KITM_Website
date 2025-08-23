@@ -10,7 +10,8 @@ import {
   searchPrograms,
   getProgramStatistics,
   toggleProgramStatus,
-  getAllActivePrograms
+  getAllActivePrograms,
+  checkSlugUniqueness
 } from "../controllers/program.controller.js";
 import { protectRoute, authRateLimit, checkRole, checkAdmin } from "../middleware/auth.middleware.js";
 import {
@@ -308,6 +309,16 @@ const validateToggle = [
     }),
 ];
 
+const handleCheckSlugUniqueness = [
+    body("slug")
+        .optional()
+        .trim()
+        .isLength({ max: 255 })
+        .withMessage("Slug must be at most 255 characters")
+        .matches(/^[a-z0-9-]+$/i)
+        .withMessage("Slug can only contain letters, numbers, and hyphens"),
+]
+
 const handleValidationErrors = (req, res, next) => {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -344,6 +355,15 @@ router.post(
   handleValidationErrors,
   createProgram,
   cleanupOnError
+);
+
+router.get("/check-slug/:slug",
+ 
+    protectRoute,
+    checkAdmin,
+    handleCheckSlugUniqueness,
+    handleValidationErrors,
+    checkSlugUniqueness
 );
 
 router.get(

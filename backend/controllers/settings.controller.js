@@ -374,6 +374,59 @@ export const getSettingByKey = async (req, res) => {
     }
 };
 
+export const getSettingById = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const settingId = decodeId(id);
+        const isAuthenticated = !!req.user;
+
+        const where = { id: settingId };
+       
+
+        const setting = await prisma.settings.findFirst({ where });
+
+        if (!setting) {
+            return res.status(404).json({
+                success: false,
+                message: "Setting not found",
+            });
+        }
+
+        const formattedSetting = {
+            id: encodeId(setting.id),
+            setting_key: setting.setting_key,
+            setting_value: setting.setting_type === "file" && setting.setting_value 
+                ? generateFileUrl(req, setting.setting_value) 
+                : setting.setting_value,
+            setting_type: setting.setting_type,
+            group_name: setting.group_name,
+            label: setting.label,
+            description: setting.description,
+            placeholder: setting.placeholder,
+            validation: setting.validation ? JSON.parse(setting.validation) : null,
+            options: setting.options ? JSON.parse(setting.options) : null,
+            is_public: setting.is_public,
+            is_required: setting.is_required,
+            sort_order: setting.sort_order,
+            created_at: setting.created_at,
+            updated_at: setting.updated_at,
+        };
+
+        res.json({
+            success: true,
+            message: "Setting retrieved successfully",
+            data: formattedSetting,
+        });
+    } catch (error) {
+        console.error("Error in getSettingByKey controller:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error retrieving setting",
+            error: error.message,
+        });
+    }
+};
+
 export const createSetting = async (req, res) => {
     try {
         const {
@@ -390,6 +443,10 @@ export const createSetting = async (req, res) => {
             is_required = false,
             sort_order = 0,
         } = req.body;
+
+        const IsPublic = is_public === "true" ? true : false;
+        const IsRequired = is_required === "true" ? true : false;
+        const sortOrder = parseInt(sort_order);
 
         // Check if setting_key already exists
         const existingSetting = await prisma.settings.findUnique({
@@ -426,9 +483,9 @@ export const createSetting = async (req, res) => {
                 placeholder,
                 validation: validation ? JSON.stringify(validation) : null,
                 options: options ? JSON.stringify(options) : null,
-                is_public,
-                is_required,
-                sort_order,
+                is_public: IsPublic,
+                is_required: IsRequired,
+                sort_order:sortOrder,
             },
         });
 
@@ -484,6 +541,10 @@ export const updateSetting = async (req, res) => {
             sort_order,
         } = req.body;
 
+        const IsPublic = is_public === "true" ? true : false;
+        const IsRequired = is_required === "true" ? true : false;
+        const sortOrder = parseInt(sort_order);
+
         const decodedId = decodeId(id);
 
         const existingSetting = await prisma.settings.findUnique({
@@ -533,9 +594,9 @@ export const updateSetting = async (req, res) => {
             placeholder,
             validation: validation ? JSON.stringify(validation) : undefined,
             options: options ? JSON.stringify(options) : undefined,
-            is_public,
-            is_required,
-            sort_order,
+            is_public: IsPublic,
+            is_required: IsRequired,
+            sort_order: sortOrder,
             updated_at: new Date(),
         };
 

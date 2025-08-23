@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { encodeId, decodeId } from "../lib/secure.js";
-import { handleLocalFileUploads, generateFileUrl, deleteFile} from "../middleware/multer.middleware.js";
+import { handleLocalFileUploads, generateFileUrl, deleteFile } from "../middleware/multer.middleware.js";
 
 const prisma = new PrismaClient();
 
@@ -47,6 +47,12 @@ export const createProgram = async (req, res) => {
             sort_order = 0,
         } = req.body;
 
+        const IsActive = is_active === "true" ? true : false;
+        const IsFeatured = is_featured === "true" ? true : false;
+        const tuitionFee = parseFloat(tuition_fee);
+        const sortOrder = parseInt(sort_order);
+
+
         const existing = await prisma.programs.findFirst({
             where: {
                 OR: [{ code }, { slug: slug || await generateSlug(name, prisma) }],
@@ -75,10 +81,10 @@ export const createProgram = async (req, res) => {
                 total_seats: parsedTotalSeats,
                 eligibility_criteria,
                 career_prospects,
-                tuition_fee,
-                is_active,
-                is_featured,
-                sort_order,
+                tuition_fee: tuitionFee,
+                is_active:IsActive ,
+                is_featured: IsFeatured,
+                sort_order: sortOrder,
                 featured_image: uploadedFiles.featured_image || null,
                 brochure_file: uploadedFiles.brochure_file || null,
             },
@@ -167,8 +173,8 @@ export const getProgramByIdOrSlug = async (req, res) => {
                 total_seats: program.total_seats,
                 eligibility_criteria: program.eligibility_criteria,
                 career_prospects: program.career_prospects,
-                featured_image: program.featured_image,
-                brochure_file: program.brochure_file,
+                 featured_image: program.featured_image ? generateFileUrl(req, program.featured_image) : null,
+                brochure_file: program.brochure_file ? generateFileUrl(req, program.brochure_file) : null,
                 tuition_fee: program.tuition_fee ? program.tuition_fee.toString() : null,
                 is_active: program.is_active,
                 is_featured: program.is_featured,
@@ -235,8 +241,8 @@ export const getAllPrograms = async (req, res) => {
                 total_seats: program.total_seats,
                 eligibility_criteria: program.eligibility_criteria,
                 career_prospects: program.career_prospects,
-                featured_image: program.featured_image,
-                brochure_file: program.brochure_file,
+                featured_image: program.featured_image ? generateFileUrl(req, program.featured_image) : null,
+                brochure_file: program.brochure_file ? generateFileUrl(req, program.brochure_file) : null,
                 tuition_fee: program.tuition_fee ? program.tuition_fee.toString() : null,
                 is_active: program.is_active,
                 is_featured: program.is_featured,
@@ -308,8 +314,8 @@ export const getAllActivePrograms = async (req, res) => {
                 total_seats: program.total_seats,
                 eligibility_criteria: program.eligibility_criteria,
                 career_prospects: program.career_prospects,
-                featured_image: program.featured_image,
-                brochure_file: program.brochure_file,
+                 featured_image: program.featured_image ? generateFileUrl(req, program.featured_image) : null,
+                brochure_file: program.brochure_file ? generateFileUrl(req, program.brochure_file) : null,
                 tuition_fee: program.tuition_fee ? program.tuition_fee.toString() : null,
                 is_active: program.is_active,
                 is_featured: program.is_featured,
@@ -356,6 +362,13 @@ export const updatePrograms = async (req, res) => {
         } = req.body;
         const decodedId = decodeId(id);
 
+        
+        const IsActive = is_active === "true" ? true : false;
+        const IsFeatured = is_featured === "true" ? true : false;
+        const tuitionFee = parseFloat(tuition_fee);
+        const sortOrder = parseInt(sort_order)
+
+
         const existingProgram = await prisma.programs.findUnique({
             where: { id: decodedId },
         });
@@ -387,7 +400,7 @@ export const updatePrograms = async (req, res) => {
         // Handle file uploads - Check multiple sources with debugging
         let newFeaturedImagePath = null;
         let newBrochureFilePath = null;
-        
+
         // Check if there's a single file upload
         if (req.file) {
             if (req.file.fieldname === 'featured_image') {
@@ -416,7 +429,7 @@ export const updatePrograms = async (req, res) => {
                 }
             }
         }
-        
+
         // Fallback to handleLocalFileUploads if above didn't work
         if (!newFeaturedImagePath || !newBrochureFilePath) {
             const uploadedFiles = handleLocalFileUploads(req);
@@ -442,10 +455,10 @@ export const updatePrograms = async (req, res) => {
             total_seats: typeof total_seats === 'string' ? parseInt(total_seats) : total_seats,
             eligibility_criteria,
             career_prospects,
-            tuition_fee,
-            is_active,
-            is_featured,
-            sort_order,
+            tuition_fee: tuitionFee,
+            is_active: IsActive,
+            is_featured: IsFeatured,
+            sort_order: sortOrder,
             updated_at: new Date(),
         };
 
@@ -524,151 +537,6 @@ export const updatePrograms = async (req, res) => {
     }
 };
 
-// export const updatePrograms = async (req, res) => {
-//     try {
-//         const { id } = req.params;
-//         const {
-//             name,
-//             code,
-//             slug,
-//             short_description,
-//             full_description,
-//             duration,
-//             degree_type,
-//             affiliated_university,
-//             total_seats,
-//             eligibility_criteria,
-//             career_prospects,
-//             tuition_fee,
-//             is_active,
-//             is_featured,
-//             sort_order,
-//         } = req.body;
-//         const decodedId = decodeId(id);
-
-//         const existingProgram = await prisma.programs.findUnique({
-//             where: { id: decodedId },
-//         });
-
-//         if (!existingProgram) {
-//             return res.status(404).json({
-//                 success: false,
-//                 message: "Program not found",
-//             });
-//         }
-
-//         const existing = await prisma.programs.findFirst({
-//             where: {
-//                 OR: [
-//                     { code },
-//                     { slug: slug || (name ? await generateSlug(name, prisma, decodedId) : existingProgram.slug) },
-//                 ],
-//                 NOT: { id: decodedId },
-//             },
-//         });
-
-//         if (existing) {
-//             return res.status(400).json({
-//                 success: false,
-//                 message: "Program code or slug already exists",
-//             });
-//         }
-//         const uploadedFiles = handleLocalFileUploads(req);
-//         const updateData = {
-//             name,
-//             code,
-//             slug,
-//             short_description,
-//             full_description,
-//             duration,
-//             degree_type,
-//             affiliated_university,
-//             total_seats: typeof total_seats === 'string' ? parseInt(total_seats) : total_seats,
-//             eligibility_criteria,
-//             career_prospects,
-//             tuition_fee,
-//             is_active,
-//             is_featured,
-//             sort_order,
-//         };
-
-//         // Handle file updates and cleanup
-//         if (uploadedFiles.featured_image) {
-//             // Delete old featured image if exists
-//             if (existingProgram.featured_image) {
-//                 await deleteFile(existingProgram.featured_image);
-//             }
-//             updateData.featured_image = uploadedFiles.featured_image;
-//         }
-
-//         if (uploadedFiles.brochure_file) {
-//             // Delete old brochure file if exists
-//             if (existingProgram.brochure_file) {
-//                 await deleteFile(existingProgram.brochure_file);
-//             }
-//             updateData.brochure_file = uploadedFiles.brochure_file;
-//         }
-
-//         const program = await prisma.programs.update({
-//             where: { id: decodedId },
-//             data: updateData,
-//             // data: {
-//             //     name,
-//             //     code,
-//             //     slug: slug || (name ? await generateSlug(name, prisma, decodedId) : undefined),
-//             //     short_description,
-//             //     full_description,
-//             //     duration,
-//             //     degree_type,
-//             //     affiliated_university,
-//             //     total_seats,
-//             //     eligibility_criteria,
-//             //     career_prospects,
-//             //     featured_image,
-//             //     brochure_file,
-//             //     tuition_fee,
-//             //     is_active,
-//             //     is_featured,
-//             //     sort_order,
-//             //     updated_at: new Date(),
-//             // },
-//         });
-
-//         res.json({
-//             success: true,
-//             message: "Program updated successfully",
-//             data: {
-//                 id: encodeId(program.id),
-//                 name: program.name,
-//                 code: program.code,
-//                 slug: program.slug,
-//                 short_description: program.short_description,
-//                 full_description: program.full_description,
-//                 duration: program.duration,
-//                 degree_type: program.degree_type,
-//                 affiliated_university: program.affiliated_university,
-//                 total_seats: program.total_seats,
-//                 eligibility_criteria: program.eligibility_criteria,
-//                 career_prospects: program.career_prospects,
-//                 featured_image: program.featured_image ? generateFileUrl(req, program.featured_image) : null,
-//                 brochure_file: program.brochure_file ? generateFileUrl(req, program.brochure_file) : null,
-//                 tuition_fee: program.tuition_fee ? program.tuition_fee.toString() : null,
-//                 is_active: program.is_active,
-//                 is_featured: program.is_featured,
-//                 sort_order: program.sort_order,
-//                 created_at: program.created_at,
-//                 updated_at: program.updated_at,
-//             },
-//         });
-//     } catch (error) {
-//         console.error("Error in update program controller:", error);
-//         res.status(500).json({
-//             success: false,
-//             message: "Error updating program",
-//             error: error.message,
-//         });
-//     }
-// };
 
 export const deleteProgram = async (req, res) => {
     try {
@@ -759,8 +627,8 @@ export const searchPrograms = async (req, res) => {
                 total_seats: program.total_seats,
                 eligibility_criteria: program.eligibility_criteria,
                 career_prospects: program.career_prospects,
-                featured_image: program.featured_image,
-                brochure_file: program.brochure_file,
+                 featured_image: program.featured_image ? generateFileUrl(req, program.featured_image) : null,
+                brochure_file: program.brochure_file ? generateFileUrl(req, program.brochure_file) : null,
                 tuition_fee: program.tuition_fee ? program.tuition_fee.toString() : null,
                 is_active: program.is_active,
                 is_featured: program.is_featured,
@@ -899,8 +767,8 @@ export const toggleProgramStatus = async (req, res) => {
                 total_seats: updatedProgram.total_seats,
                 eligibility_criteria: updatedProgram.eligibility_criteria,
                 career_prospects: updatedProgram.career_prospects,
-                featured_image: updatedProgram.featured_image,
-                brochure_file: updatedProgram.brochure_file,
+                  featured_image: program.featured_image ? generateFileUrl(req, program.featured_image) : null,
+                brochure_file: program.brochure_file ? generateFileUrl(req, program.brochure_file) : null,
                 tuition_fee: updatedProgram.tuition_fee ? updatedProgram.tuition_fee.toString() : null,
                 is_active: updatedProgram.is_active,
                 is_featured: updatedProgram.is_featured,
@@ -914,6 +782,52 @@ export const toggleProgramStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error toggling program status",
+            error: error.message,
+        });
+    }
+};
+
+export const checkSlugUniqueness = async (req, res) => {
+    try {
+
+        const { slug: providedSlug } = req.params;
+        const { excludeId: encodedProgramId } = req.query;
+
+        let slugToCheck = providedSlug;
+
+        // If no slug provided, generate from title
+
+        if (!slugToCheck) {
+            return res.status(400).json({
+                success: false,
+                message: "Slug  is required",
+            });
+        }
+
+        // Decode pageId if updating (to exclude current page from uniqueness check)
+        const decodedProgramId = encodedProgramId ? decodeId(encodedProgramId) : null;
+
+        // Check if any other page uses this slug
+        const existingProgram = await prisma.programs.findFirst({
+            where: {
+                slug: slugToCheck,
+                NOT: decodedProgramId ? { id: decodedProgramId } : undefined,
+            },
+        });
+
+        res.json({
+            success: true,
+            isUnique: !existingProgram,
+            slug: slugToCheck,
+            message: existingProgram
+                ? "Slug is already in use"
+                : "Slug is available",
+        });
+    } catch (error) {
+        console.error("Error in checkSlugUniqueness controller:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error checking slug uniqueness",
             error: error.message,
         });
     }

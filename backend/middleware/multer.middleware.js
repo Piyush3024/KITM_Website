@@ -32,6 +32,7 @@ const ENTITY_CONFIGS = {
         fields: {
             image: 'images',
             thumbnail: 'thumbnails',
+            cover_image: 'covers',
             files: 'files'
         },
         defaultSubfolder: 'images'
@@ -219,7 +220,10 @@ export const uploadAny = (entity = null) => {
 };
 
 export const uploadSingle = (fieldName, entity = null) => {
+
+   
     return multer(createMulterConfig(entity)).single(fieldName);
+    
 };
 
 export const uploadArray = (fieldName, maxCount = 5, entity = null) => {

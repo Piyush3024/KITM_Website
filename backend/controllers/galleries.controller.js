@@ -1,6 +1,7 @@
 import { PrismaClient } from "@prisma/client";
 import { encodeId, decodeId } from "../lib/secure.js";
 import { handleLocalFileUploads, generateFileUrl, deleteFile } from "../middleware/multer.middleware.js";
+import { parse } from "path";
 
 const prisma = new PrismaClient();
 
@@ -24,8 +25,8 @@ const generateSlug = async (title, prisma, excludeId = null) => {
 
     return uniqueSlug;
 };
-
 export const createGallery = async (req, res) => {
+   
     try {
         const {
             title,
@@ -35,9 +36,54 @@ export const createGallery = async (req, res) => {
             sort_order = 0,
             media_items = []
         } = req.body;
+        
+        const isActive = is_active === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
+        const sortOrder = parseInt(sort_order);
+        
+        // Enhanced parsing for media_items to handle mixed data types
+        let parsedMediaItems = [];
+        
+        if (media_items && Array.isArray(media_items)) {
+            // Handle array of mixed types (objects and JSON strings)
+            parsedMediaItems = media_items.flatMap(item => {
+                // Skip invalid object strings
+                if (typeof item === 'string' && (item === '[object Object]' || item.startsWith('[object'))) {
+                    console.warn('Skipping invalid object string:', item);
+                    return [];
+                }
+                
+                // If it's already an object, use it directly
+                if (typeof item === 'object' && item !== null) {
+                    return Array.isArray(item) ? item : [item];
+                }
+                
+                // If it's a JSON string, try to parse it
+                if (typeof item === 'string') {
+                    try {
+                        const parsed = JSON.parse(item);
+                        return Array.isArray(parsed) ? parsed : [parsed];
+                    } catch (error) {
+                        console.error('Failed to parse media item:', item, error);
+                        return [];
+                    }
+                }
+                
+                return [];
+            });
+        } else if (typeof media_items === 'string') {
+            // Handle single JSON string
+            try {
+                const parsed = JSON.parse(media_items);
+                parsedMediaItems = Array.isArray(parsed) ? parsed : [parsed];
+            } catch (error) {
+                console.error('Failed to parse media_items string:', error);
+                parsedMediaItems = [];
+            }
+        }
 
-        // Parse media_items if it's a string (from form data)
-        const parsedMediaItems = typeof media_items === 'string' ? JSON.parse(media_items) : media_items;
+        console.log("Parsed media items:", parsedMediaItems);
+        console.log("Media IDs:", parsedMediaItems.map(item => item?.media_id || 'No ID'));
 
         // Check for existing slug
         const existing = await prisma.galleries.findFirst({
@@ -71,9 +117,9 @@ export const createGallery = async (req, res) => {
                     slug: req.body.slug || (await generateSlug(title, prisma)),
                     description,
                     cover_image: finalCoverImagePath,
-                    is_active,
-                    is_featured,
-                    sort_order,
+                    is_active: isActive,
+                    is_featured: isFeatured,
+                    sort_order: sortOrder,
                     created_by: req.user.id,
                     updated_by: req.user.id,
                     created_at: new Date(),
@@ -83,16 +129,29 @@ export const createGallery = async (req, res) => {
 
             // Add media items if provided
             if (parsedMediaItems && parsedMediaItems.length > 0) {
-                const galleryItemsData = parsedMediaItems.map((item, index) => ({
-                    gallery_id: gallery.id,
-                    media_id: decodeId(item.media_id),
-                    caption: item.caption || null,
-                    sort_order: item.sort_order || index,
-                }));
-
-                await tx.gallery_items.createMany({
-                    data: galleryItemsData,
+                // Validate that each item has required properties
+                const validMediaItems = parsedMediaItems.filter(item => {
+                    if (!item || !item.media_id) {
+                        console.warn('Skipping invalid media item:', item);
+                        return false;
+                    }
+                    return true;
                 });
+
+                if (validMediaItems.length > 0) {
+                    const galleryItemsData = validMediaItems.map((item, index) => ({
+                        gallery_id: gallery.id,
+                        media_id: decodeId(item.media_id),
+                        caption: item.caption || null,
+                        sort_order: item.sort_order || index,
+                    }));
+
+                    console.log("Gallery items to create:", galleryItemsData);
+
+                    await tx.gallery_items.createMany({
+                        data: galleryItemsData,
+                    });
+                }
             }
 
             return gallery;
@@ -127,6 +186,114 @@ export const createGallery = async (req, res) => {
         });
     }
 };
+
+// export const createGallery = async (req, res) => {
+//     try {
+//         const {
+//             title,
+//             description,
+//             is_active = true,
+//             is_featured = false,
+//             sort_order = 0,
+//             media_items = []
+//         } = req.body;
+//         const isActive = is_active === "true" ? true : false;
+//         const isFeatured = is_featured === "true" ? true : false;
+//         const sortOrder = parseInt(sort_order);
+//         // Parse media_items if it's a string (from form data)
+//         const parsedMediaItems = typeof media_items === 'string' ? JSON.parse(media_items) : media_items;
+
+//         // Check for existing slug
+//         const existing = await prisma.galleries.findFirst({
+//             where: { slug: req.body.slug || (await generateSlug(title, prisma)) },
+//         });
+
+//         if (existing) {
+//             return res.status(400).json({
+//                 success: false,
+//                 message: "Gallery slug already exists",
+//             });
+//         }
+
+//         // Handle cover image upload
+//         let coverImagePath = null;
+//         if (req.file) {
+//             coverImagePath = req.file.path;
+//         } else if (req.files?.cover_image?.[0]) {
+//             coverImagePath = req.files.cover_image[0].path;
+//         }
+
+//         const uploadedFiles = handleLocalFileUploads(req);
+//         const finalCoverImagePath = coverImagePath || uploadedFiles.cover_image || null;
+
+//         // Use transaction to ensure data consistency
+//         const result = await prisma.$transaction(async (tx) => {
+//             // Create gallery
+//             const gallery = await tx.galleries.create({
+//                 data: {
+//                     title,
+//                     slug: req.body.slug || (await generateSlug(title, prisma)),
+//                     description,
+//                     cover_image: finalCoverImagePath,
+//                     is_active: isActive,
+//                     is_featured: isFeatured,
+//                     sort_order: sortOrder,
+//                     created_by: req.user.id,
+//                     updated_by: req.user.id,
+//                     created_at: new Date(),
+//                     updated_at: new Date(),
+//                 },
+//             });
+//             console.log("Parsed media items:", parsedMediaItems);
+
+//             console.log("parsedMediaItems", parsedMediaItems.map((item) => (item.media_id)));
+
+//             // Add media items if provided
+//             if (parsedMediaItems && parsedMediaItems.length > 0) {
+//                 const galleryItemsData = parsedMediaItems.map((item, index) => ({
+//                     gallery_id: gallery.id,
+//                     media_id: decodeId(item.media_id),
+//                     caption: item.caption || null,
+//                     sort_order: item.sort_order || index,
+//                 }));
+
+//                 await tx.gallery_items.createMany({
+//                     data: galleryItemsData,
+//                 });
+//             }
+
+//             return gallery;
+//         });
+
+//         const coverImageUrl = result.cover_image ? generateFileUrl(req, result.cover_image) : null;
+
+//         res.status(201).json({
+//             success: true,
+//             message: "Gallery created successfully",
+//             data: {
+//                 id: encodeId(result.id),
+//                 title: result.title,
+//                 slug: result.slug,
+//                 description: result.description,
+//                 cover_image: coverImageUrl,
+//                 is_active: result.is_active,
+//                 is_featured: result.is_featured,
+//                 sort_order: result.sort_order,
+//                 created_by: encodeId(result.created_by),
+//                 updated_by: encodeId(result.updated_by),
+//                 created_at: result.created_at,
+//                 updated_at: result.updated_at,
+//             },
+//         });
+//     } catch (error) {
+//         console.error("Error in createGallery controller:", error);
+//         res.status(500).json({
+//             success: false,
+//             message: "Error creating gallery",
+//             error: error.message,
+//         });
+//     }
+// };
 
 export const getGalleryById = async (req, res) => {
     try {
@@ -289,7 +456,8 @@ export const getAllGalleries = async (req, res) => {
             is_active,
             is_featured
         } = req.query;
-
+        const isActive = is_active === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
 
@@ -356,7 +524,7 @@ export const getAllPublishedGalleries = async (req, res) => {
             sortOrder = "asc",
             is_featured
         } = req.query;
-
+        const isFeatured = is_featured === "true" ? true : false;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
 
@@ -425,7 +593,9 @@ export const updateGallery = async (req, res) => {
             media_items = []
         } = req.body;
         const decodedId = decodeId(id);
-
+        const isActive = is_active === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
+        const sortOrder = parseInt(sort_order);
         // Parse media_items if it's a string (from form data)
         const parsedMediaItems = typeof media_items === 'string' ? JSON.parse(media_items) : media_items;
 
@@ -476,13 +646,13 @@ export const updateGallery = async (req, res) => {
             const updateData = {
                 title,
                 description,
-                is_active,
-                is_featured,
-                sort_order,
+                is_active: isActive,
+                is_featured: isFeatured,
+                sort_order: sortOrder,
                 updated_by: req.user.id,
                 updated_at: new Date(),
             };
-
+       
             // Handle cover image update
             if (newCoverImagePath) {
                 if (existingGallery.cover_image) {
@@ -602,6 +772,7 @@ export const deleteGallery = async (req, res) => {
 export const toggleGalleryStatus = async (req, res) => {
     try {
         const { id } = req.params;
+        const { toggle } = req.body;
         const decodedId = decodeId(id);
 
         const gallery = await prisma.galleries.findUnique({
@@ -615,13 +786,19 @@ export const toggleGalleryStatus = async (req, res) => {
             });
         }
 
+        const updateData = {};
+        if (toggle.includes("is_active")) {
+            updateData.is_active = !gallery.is_active;
+        }
+        if (toggle.includes("is_featured")) {
+            updateData.is_featured = !gallery.is_featured;
+        }
+        updateData.updated_by = req.user.id;
+        updateData.updated_at = new Date();
+
         const updatedGallery = await prisma.galleries.update({
             where: { id: decodedId },
-            data: {
-                is_active: !gallery.is_active,
-                updated_by: req.user.id,
-                updated_at: new Date(),
-            },
+            data: updateData,
         });
 
         res.json({
@@ -651,6 +828,58 @@ export const toggleGalleryStatus = async (req, res) => {
         });
     }
 };
+// export const toggleGalleryStatus = async (req, res) => {
+//     try {
+//         const { id } = req.params;
+//         const decodedId = decodeId(id);
+
+//         const gallery = await prisma.galleries.findUnique({
+//             where: { id: decodedId },
+//         });
+
+//         if (!gallery) {
+//             return res.status(404).json({
+//                 success: false,
+//                 message: "Gallery not found",
+//             });
+//         }
+
+//         const updatedGallery = await prisma.galleries.update({
+//             where: { id: decodedId },
+//             data: {
+//                 is_active: !gallery.is_active,
+//                 updated_by: req.user.id,
+//                 updated_at: new Date(),
+//             },
+//         });
+
+//         res.json({
+//             success: true,
+//             message: "Gallery status toggled successfully",
+//             data: {
+//                 id: encodeId(updatedGallery.id),
+//                 title: updatedGallery.title,
+//                 slug: updatedGallery.slug,
+//                 description: updatedGallery.description,
+//                 cover_image: updatedGallery.cover_image ? generateFileUrl(req, updatedGallery.cover_image) : null,
+//                 is_active: updatedGallery.is_active,
+//                 is_featured: updatedGallery.is_featured,
+//                 sort_order: updatedGallery.sort_order,
+//                 created_by: encodeId(updatedGallery.created_by),
+//                 updated_by: encodeId(updatedGallery.updated_by),
+//                 created_at: updatedGallery.created_at,
+//                 updated_at: updatedGallery.updated_at,
+//             },
+//         });
+//     } catch (error) {
+//         console.error("Error in toggleGalleryStatus controller:", error);
+//         res.status(500).json({
+//             success: false,
+//             message: "Error toggling gallery status",
+//             error: error.message,
+//         });
+//     }
+// };
 
 export const searchGalleries = async (req, res) => {
     try {
@@ -664,7 +893,8 @@ export const searchGalleries = async (req, res) => {
             is_featured
         } = req.query;
         const isAuthenticated = !!req.user;
-
+        const isActive = is_active === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
 
@@ -1171,6 +1401,52 @@ export const getGalleryItems = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error retrieving gallery items",
+            error: error.message,
+        });
+    }
+};
+
+export const checkSlugUniqueness = async (req, res) => {
+    try {
+
+        const { slug: providedSlug } = req.params;
+        const { excludeId: encodedGalleryId } = req.query;
+
+        let slugToCheck = providedSlug;
+
+        // If no slug provided, generate from title
+
+        if (!slugToCheck) {
+            return res.status(400).json({
+                success: false,
+                message: "Slug  is required",
+            });
+        }
+
+        // Decode pageId if updating (to exclude current page from uniqueness check)
+        const decodedGalleryId = encodedGalleryId ? decodeId(encodedGalleryId) : null;
+
+        // Check if any other page uses this slug
+        const existingGallery = await prisma.galleries.findFirst({
+            where: {
+                slug: slugToCheck,
+                NOT: decodedGalleryId ? { id: decodedGalleryId } : undefined,
+            },
+        });
+
+        res.json({
+            success: true,
+            isUnique: !existingGallery,
+            slug: slugToCheck,
+            message: existingGallery
+                ? "Slug is already in use"
+                : "Slug is available",
+        });
+    } catch (error) {
+        console.error("Error in checkSlugUniqueness controller:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error checking slug uniqueness",
             error: error.message,
         });
     }

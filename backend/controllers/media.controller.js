@@ -19,7 +19,7 @@ const determineFileType = (mimeType) => {
 
 export const uploadMedia = async (req, res) => {
 
-  
+
     try {
         const { alt_text, caption } = req.body;
 
@@ -41,7 +41,7 @@ export const uploadMedia = async (req, res) => {
         // Process each uploaded file
         for (const file of fileArray) {
             const fileType = determineFileType(file.mimetype);
-            
+
             const mediaData = {
                 original_name: file.originalname,
                 filename: file.filename,
@@ -328,7 +328,6 @@ export const updateMedia = async (req, res) => {
                 message: "Media not found",
             });
         }
-
         // Check if user owns this media or is admin
         if (existingMedia.uploaded_by !== req.user.id && req.user.role !== 'admin') {
             return res.status(403).json({
@@ -352,6 +351,7 @@ export const updateMedia = async (req, res) => {
                 }
             }
         });
+
 
         res.json({
             success: true,

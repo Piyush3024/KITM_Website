@@ -11,7 +11,8 @@ import {
     getNoticeStatistics,
     toggleNoticeStatus,
     getNoticeByType,
-    getAllPublishedNotices
+    getAllPublishedNotices,
+    checkSlugUniqueness
 
 } from "../controllers/notice.controller.js";
 import { protectRoute, authRateLimit, checkRole, checkAdmin } from "../middleware/auth.middleware.js";
@@ -251,6 +252,16 @@ const validateToggle = [
         }),
 ];
 
+const handleCheckSlugUniqueness = [
+    body("slug")
+        .optional()
+        .trim()
+        .isLength({ max: 255 })
+        .withMessage("Slug must be at most 255 characters")
+        .matches(/^[a-z0-9-]+$/i)
+        .withMessage("Slug can only contain letters, numbers, and hyphens"),
+]
+
 
 
 const handleValidationErrors = (req, res, next) => {
@@ -289,6 +300,15 @@ router.post(
     handleValidationErrors,
     createNotice,
     cleanupOnError
+);
+
+router.get("/check-slug/:slug",
+ 
+    protectRoute,
+    checkAdmin,
+    handleCheckSlugUniqueness,
+    handleValidationErrors,
+    checkSlugUniqueness
 );
 
 router.get(

@@ -9,7 +9,8 @@ import {
     deletePage,
     searchPages,
     togglePageStatus,
-    getAllPublishedPages
+    getAllPublishedPages,
+    checkSlugUniqueness
 } from "../controllers/pages.controller.js";
 import { protectRoute, authRateLimit, checkRole, checkAdmin } from "../middleware/auth.middleware.js";
 import { uploadSingle, validateFileTypes, organizeFiles, cleanupOnError, setUploadEntity } from "../middleware/multer.middleware.js";
@@ -94,10 +95,6 @@ const validateCreate = [
         .withMessage("Meta description must be at most 255 characters")
         .matches(/^[a-zA-Z0-9\s\u0900-\u097F,.()-]+$/)
         .withMessage("Meta description can only contain letters, numbers, spaces, and basic punctuation"),
-    body("template_type")
-        .optional()
-        .isLength({ max: 50 })
-        .withMessage("Template type must be at most 50 characters"),
     body("is_published")
         .optional()
         .isBoolean()
@@ -143,10 +140,6 @@ const validateUpdate = [
         .withMessage("Meta description must be at most 255 characters")
         .matches(/^[a-zA-Z0-9\s\u0900-\u097F,.()-]+$/)
         .withMessage("Meta description can only contain letters, numbers, spaces, and basic punctuation"),
-    body("template_type")
-        .optional()
-        .isLength({ max: 50 })
-        .withMessage("Template type must be at most 50 characters"),
     body("is_published")
         .optional()
         .isBoolean()
@@ -190,11 +183,18 @@ const validateSearch = [
         .optional()
         .isIn(["asc", "desc"])
         .withMessage("SortOrder must be either asc or desc"),
-    query("template_type")
-        .optional()
-        .isLength({ max: 50 })
-        .withMessage("Template type must be at most 50 characters"),
+   
 ];
+
+const handleCheckSlugUniqueness = [
+    body("slug")
+        .optional()
+        .trim()
+        .isLength({ max: 255 })
+        .withMessage("Slug must be at most 255 characters")
+        .matches(/^[a-z0-9-]+$/i)
+        .withMessage("Slug can only contain letters, numbers, and hyphens"),
+]
 
 const handleValidationErrors = (req, res, next) => {
     const errors = validationResult(req);
@@ -232,6 +232,15 @@ router.post(
     handleValidationErrors,
     createPage,
     cleanupOnError
+);
+
+router.get("/check-slug/:slug",
+ 
+    protectRoute,
+    checkAdmin,
+    handleCheckSlugUniqueness,
+    handleValidationErrors,
+    checkSlugUniqueness
 );
 
 router.get(

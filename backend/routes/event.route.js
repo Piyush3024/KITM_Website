@@ -12,7 +12,8 @@ import {
     getEventStatistics,
     toggleEventStatus,
     getEventByType,
-    getAllPublishedEvents
+    getAllPublishedEvents,
+    checkSlugUniqueness
 } from "../controllers/event.controller.js";
 import { protectRoute, authRateLimit, checkRole, checkAdmin } from "../middleware/auth.middleware.js";
 import { uploadSingle, validateFileTypes, organizeFiles, cleanupOnError, setUploadEntity } from "../middleware/multer.middleware.js";
@@ -95,14 +96,14 @@ const validateCreate = [
         .optional()
         .isISO8601()
         .withMessage("End date must be a valid ISO 8601 date"),
-    body("start_time")
-        .optional()
-        .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)
-        .withMessage("Start time must be in HH:mm:ss format"),
-    body("end_time")
-        .optional()
-        .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)
-        .withMessage("End time must be in HH:mm:ss format"),
+    // body("start_time")
+    //     .optional()
+    //     .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)
+    //     .withMessage("Start time must be in HH:mm:ss format"),
+    // body("end_time")
+    //     .optional()
+    //     .matches(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/)
+    //     .withMessage("End time must be in HH:mm:ss format"),
     body("location")
         .optional()
         .isLength({ max: 255 })
@@ -279,6 +280,16 @@ const validateType = [
         .withMessage("Invalid event type"),
 ];
 
+const handleCheckSlugUniqueness = [
+    body("slug")
+        .optional()
+        .trim()
+        .isLength({ max: 255 })
+        .withMessage("Slug must be at most 255 characters")
+        .matches(/^[a-z0-9-]+$/i)
+        .withMessage("Slug can only contain letters, numbers, and hyphens"),
+]
+
 const handleValidationErrors = (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -316,6 +327,16 @@ router.post(
     createEvent,
     cleanupOnError
 );
+
+router.get("/check-slug/:slug",
+
+    protectRoute,
+    checkAdmin,
+    handleCheckSlugUniqueness,
+    handleValidationErrors,
+    checkSlugUniqueness
+);
+
 
 router.get(
     "/search",

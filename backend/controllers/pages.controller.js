@@ -33,10 +33,12 @@ export const createPage = async (req, res) => {
             excerpt,
             meta_title,
             meta_description,
-            template_type = "default",
             is_published = true,
             sort_order = 0,
         } = req.body;
+
+        const Ispublished = is_published === "true" ? true : false;
+        const sortOrder = parseInt(sort_order);
 
         // Check for existing slug
         const existing = await prisma.pages.findFirst({
@@ -61,6 +63,7 @@ export const createPage = async (req, res) => {
         const uploadedFiles = handleLocalFileUploads(req);
         const finalFeaturedImagePath = featuredImagePath || uploadedFiles.featured_image || null;
 
+
         const page = await prisma.pages.create({
             data: {
                 title,
@@ -69,9 +72,8 @@ export const createPage = async (req, res) => {
                 excerpt,
                 meta_title,
                 meta_description,
-                template_type,
-                is_published,
-                sort_order,
+                is_published: Ispublished,
+                sort_order: sortOrder,
                 featured_image: finalFeaturedImagePath,
                 created_by: req.user.id,
                 updated_by: req.user.id,
@@ -93,7 +95,6 @@ export const createPage = async (req, res) => {
                 excerpt: page.excerpt,
                 meta_title: page.meta_title,
                 meta_description: page.meta_description,
-                template_type: page.template_type,
                 is_published: page.is_published,
                 sort_order: page.sort_order,
                 featured_image: featuredImageUrl,
@@ -115,8 +116,11 @@ export const createPage = async (req, res) => {
 
 export const getPageByIdOrSlug = async (req, res) => {
     try {
+       
         const { idOrSlug } = req.params;
-        const isAuthenticated = !!req.user;
+ 
+        // const isAuthenticated = !!req.user;
+     
 
         let page;
         const decodedId = decodeId(idOrSlug, true);
@@ -136,13 +140,13 @@ export const getPageByIdOrSlug = async (req, res) => {
                 message: "Page not found",
             });
         }
+        //   if (!isAuthenticated ) {
+        //     return res.status(403).json({
+        //         success: false,
+        //         message: "Page is not published",
+        //     });
+        // }
 
-        if (!isAuthenticated && !page.is_published) {
-            return res.status(403).json({
-                success: false,
-                message: "Page is not published",
-            });
-        }
 
         res.json({
             success: true,
@@ -155,7 +159,6 @@ export const getPageByIdOrSlug = async (req, res) => {
                 excerpt: page.excerpt,
                 meta_title: page.meta_title,
                 meta_description: page.meta_description,
-                template_type: page.template_type,
                 is_published: page.is_published,
                 sort_order: page.sort_order,
                 featured_image: page.featured_image ? generateFileUrl(req, page.featured_image) : null,
@@ -182,7 +185,6 @@ export const getAllPublishedPages = async (req, res) => {
             limit = 10,
             sortBy = "sort_order",
             sortOrder = "asc",
-            template_type,
         } = req.query;
         const isAuthenticated = !!req.user;
 
@@ -190,7 +192,6 @@ export const getAllPublishedPages = async (req, res) => {
         const take = parseInt(limit);
 
         const where = {};
-        if (template_type) where.template_type = template_type;
         if (!isAuthenticated) where.is_published = true;
 
         const [pages, total] = await Promise.all([
@@ -214,7 +215,6 @@ export const getAllPublishedPages = async (req, res) => {
                 excerpt: page.excerpt,
                 meta_title: page.meta_title,
                 meta_description: page.meta_description,
-                template_type: page.template_type,
                 is_published: page.is_published,
                 sort_order: page.sort_order,
                 featured_image: page.featured_image ? generateFileUrl(req, page.featured_image) : null,
@@ -246,7 +246,6 @@ export const getAllPages = async (req, res) => {
             limit = 10,
             sortBy = "sort_order",
             sortOrder = "asc",
-            template_type,
         } = req.query;
         const isAuthenticated = !!req.user;
 
@@ -254,8 +253,7 @@ export const getAllPages = async (req, res) => {
         const take = parseInt(limit);
 
         const where = {};
-        if (template_type) where.template_type = template_type;
-        if (!isAuthenticated) ;
+        if (!isAuthenticated);
 
         const [pages, total] = await Promise.all([
             prisma.pages.findMany({
@@ -278,7 +276,7 @@ export const getAllPages = async (req, res) => {
                 excerpt: page.excerpt,
                 meta_title: page.meta_title,
                 meta_description: page.meta_description,
-                template_type: page.template_type,
+
                 is_published: page.is_published,
                 sort_order: page.sort_order,
                 featured_image: page.featured_image ? generateFileUrl(req, page.featured_image) : null,
@@ -313,11 +311,13 @@ export const updatePage = async (req, res) => {
             excerpt,
             meta_title,
             meta_description,
-            template_type,
             is_published,
             sort_order,
         } = req.body;
         const decodedId = decodeId(id);
+
+         const Ispublished = is_published === "true" ? true : false;
+        const sortOrder = parseInt(sort_order);
 
         const existingPage = await prisma.pages.findUnique({
             where: { id: decodedId },
@@ -370,9 +370,8 @@ export const updatePage = async (req, res) => {
             excerpt,
             meta_title,
             meta_description,
-            template_type,
-            is_published,
-            sort_order,
+            is_published: Ispublished,
+            sort_order: sortOrder,
             updated_by: req.user.id,
             updated_at: new Date(),
         };
@@ -411,7 +410,7 @@ export const updatePage = async (req, res) => {
                 excerpt: page.excerpt,
                 meta_title: page.meta_title,
                 meta_description: page.meta_description,
-                template_type: page.template_type,
+
                 is_published: page.is_published,
                 sort_order: page.sort_order,
                 featured_image: page.featured_image ? generateFileUrl(req, page.featured_image) : null,
@@ -477,7 +476,6 @@ export const searchPages = async (req, res) => {
             limit = 10,
             sortBy = "sort_order",
             sortOrder = "asc",
-            template_type,
         } = req.query;
         const isAuthenticated = !!req.user;
 
@@ -494,7 +492,7 @@ export const searchPages = async (req, res) => {
                 { meta_description: { contains: query, mode: "insensitive" } },
             ];
         }
-        if (template_type) where.template_type = template_type;
+
         if (!isAuthenticated) where.is_published = true;
 
         const [pages, total] = await Promise.all([
@@ -518,7 +516,7 @@ export const searchPages = async (req, res) => {
                 excerpt: page.excerpt,
                 meta_title: page.meta_title,
                 meta_description: page.meta_description,
-                template_type: page.template_type,
+
                 is_published: page.is_published,
                 sort_order: page.sort_order,
                 featured_image: page.featured_image ? generateFileUrl(req, page.featured_image) : null,
@@ -582,7 +580,7 @@ export const togglePageStatus = async (req, res) => {
                 excerpt: updatedPage.excerpt,
                 meta_title: updatedPage.meta_title,
                 meta_description: updatedPage.meta_description,
-                template_type: updatedPage.template_type,
+
                 is_published: updatedPage.is_published,
                 sort_order: updatedPage.sort_order,
                 featured_image: updatedPage.featured_image ? generateFileUrl(req, updatedPage.featured_image) : null,
@@ -597,6 +595,54 @@ export const togglePageStatus = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error toggling page status",
+            error: error.message,
+        });
+    }
+};
+
+
+
+export const checkSlugUniqueness = async (req, res) => {
+    try {
+        // const { slug: providedSlug, title, pageId: encodedPageId } = req.body;
+        const { slug: providedSlug } = req.params;
+        const { excludeId: encodedPageId } = req.query;
+
+        let slugToCheck = providedSlug;
+
+        // If no slug provided, generate from title
+
+        if (!slugToCheck) {
+            return res.status(400).json({
+                success: false,
+                message: "Slug  is required",
+            });
+        }
+
+        // Decode pageId if updating (to exclude current page from uniqueness check)
+        const decodedPageId = encodedPageId ? decodeId(encodedPageId) : null;
+
+        // Check if any other page uses this slug
+        const existingPage = await prisma.pages.findFirst({
+            where: {
+                slug: slugToCheck,
+                NOT: decodedPageId ? { id: decodedPageId } : undefined,
+            },
+        });
+
+        res.json({
+            success: true,
+            isUnique: !existingPage,
+            slug: slugToCheck,
+            message: existingPage
+                ? "Slug is already in use"
+                : "Slug is available",
+        });
+    } catch (error) {
+        console.error("Error in checkSlugUniqueness controller:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error checking slug uniqueness",
             error: error.message,
         });
     }

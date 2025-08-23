@@ -7,42 +7,112 @@ const prisma = new PrismaClient();
 async function main() {
 
 
+try {
+    console.log('🌱 Starting user seeding...');
 
-  // Seed a default user for testing (e.g., for OAuth or manual login)
-  const hashedPassword1 = await bcrypt.hash('12345678', 10);
-  await prisma.users.upsert({
-    where: { username: 'testuser' },
-    update: {},
-    create: {
-      id: 1,
-      username: 'testuser',
-      password: hashedPassword1,
-      role: 'admin',
-      created_at: new Date(),
-      updated_at: new Date()
+    // Hash passwords
+    const adminPassword = await bcrypt.hash('Admin@123!', 12);
+    const authorPassword = await bcrypt.hash('Author@123!', 12);
+
+    // Check if admin already exists
+    const existingAdmin = await prisma.users.findFirst({
+      where: { role: 'admin' }
+    });
+
+    if (!existingAdmin) {
+      // Create admin user
+      const admin = await prisma.users.create({
+        data: {
+          username: 'admin',
+          email: 'admin@example.com',
+          password: adminPassword,
+          role: 'admin',
+          isTemporaryPassword: true, // Force password change on first login
+          is_active: true,
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+      });
+      console.log('✅ Admin user created:', admin.username);
+    } else {
+      console.log('ℹ️  Admin user already exists, skipping...');
     }
-  });
-//   const hashedPassword2 = await bcrypt.hash('12345678', 10);
-//   await prisma.user.upsert({
-//     where: { email: 'admin@example.com' },
-//     update: {},
-//     create: {
-//       user_id: 3,
-//       username: 'testadmin',
-//       email: 'admin@example.com',
-//       password: hashedPassword2,
-//       full_name: 'Test User',
-//       role_id: 1, // Student role
-//       location: 'Kathmandu, Nepal',
-//       email_verified: true,
-//       created_at: new Date(),
-//       updated_at: new Date()
-//     }
-//   });
 
-  console.log('Default user seeded successfully');
+    // Check if author already exists
+    const existingAuthor = await prisma.users.findFirst({
+      where: { 
+        role: 'author',
+        username: 'author'
+      }
+    });
 
-  console.log('Database seeded successfully');
+    if (!existingAuthor) {
+      // Create author user
+      const author = await prisma.users.create({
+        data: {
+          username: 'author',
+          email: 'author@example.com',
+          password: authorPassword,
+          role: 'author',
+          isTemporaryPassword: true, // Force password change on first login
+          is_active: true,
+          created_at: new Date(),
+          updated_at: new Date()
+        }
+      });
+      console.log('✅ Author user created:', author.username);
+    } else {
+      console.log('ℹ️  Author user already exists, skipping...');
+    }
+
+    // Display login credentials
+    console.log('\n📋 Default Login Credentials:');
+    console.log('=====================================');
+    console.log('👤 Admin:');
+    console.log('   Username: admin');
+    console.log('   Email: admin@example.com');
+    console.log('   Password: Admin@123!');
+    console.log('');
+    console.log('👤 Author:');
+    console.log('   Username: author');
+    console.log('   Email: author@example.com');
+    console.log('   Password: Author@123!');
+    console.log('');
+    console.log('⚠️  NOTE: These are temporary passwords. Users will be prompted to change them on first login.');
+    console.log('=====================================');
+
+  } catch (error) {
+    console.error('❌ Error seeding users:', error);
+    throw error;
+  }
+}
+
+
+
+// Alternative function to create additional users
+async function createUser(userData) {
+  try {
+    const hashedPassword = await bcrypt.hash(userData.password, 12);
+    
+    const user = await prisma.users.create({
+      data: {
+        username: userData.username,
+        email: userData.email,
+        password: hashedPassword,
+        role: userData.role || 'author',
+        isTemporaryPassword: userData.isTemporaryPassword || false,
+        is_active: userData.is_active !== undefined ? userData.is_active : true,
+        created_at: new Date(),
+        updated_at: new Date()
+      }
+    });
+
+    console.log(`✅ User created: ${user.username} (${user.role})`);
+    return user;
+  } catch (error) {
+    console.error('❌ Error creating user:', error);
+    throw error;
+  }
 }
 
 main()
