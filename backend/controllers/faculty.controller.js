@@ -21,7 +21,8 @@ export const createFaculty = async (req, res) => {
             is_featured = false,
             sort_order = 0,
         } = req.body;
-
+        const isActive = is_active === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
         // Check for existing email
         const existing = await prisma.faculty.findFirst({
             where: { email },
@@ -57,14 +58,15 @@ export const createFaculty = async (req, res) => {
                 email,
                 phone,
                 social_links: social_links ? JSON.parse(social_links) : null,
-                is_active,
-                is_featured,
+                is_active : isActive,
+                is_featured : isFeatured,
                 sort_order: sort_order ? parseInt(sort_order) : 0,
                 profile_image: finalProfileImagePath,
                 created_at: new Date(),
                 updated_at: new Date(),
             },
         });
+
 
         const profileImageUrl = faculty.profile_image ? generateFileUrl(req, faculty.profile_image) : null;
 
@@ -245,6 +247,8 @@ export const  updateFaculty = async (req, res) => {
             sort_order,
         } = req.body;
         const decodedId = decodeId(id);
+        const isActive = is_active === "true" ? true : false;
+        const isFeatured = is_featured === "true" ? true : false;
 
         const existingFaculty = await prisma.faculty.findUnique({
             where: { id: decodedId },
@@ -291,8 +295,8 @@ export const  updateFaculty = async (req, res) => {
             email,
             phone,
             social_links: social_links ? JSON.parse(social_links) : undefined,
-            is_active,
-            is_featured,
+            is_active : isActive,
+            is_featured : isFeatured,
             sort_order: sort_order !== undefined ? parseInt(sort_order) : undefined,
             updated_at: new Date(),
         };
@@ -396,7 +400,7 @@ export const searchFaculties = async (req, res) => {
             is_featured,
         } = req.query;
         const isAuthenticated = !!req.user;
-
+        const isFeatured = is_featured === "true" ? true : false;
         const skip = (parseInt(page) - 1) * parseInt(limit);
         const take = parseInt(limit);
 
@@ -597,7 +601,7 @@ export const getFacultyByDepartment = async (req, res) => {
             is_featured,
         } = req.query;
         const isAuthenticated = !!req.user;
-
+        const isFeatured = is_featured === "true" ? true : false;
         if (!department) {
             return res.status(400).json({
                 success: false,
@@ -673,6 +677,7 @@ export const getFacultyByStatus = async (req, res) => {
             department,
             is_featured,
         } = req.query;
+        const isFeatured = is_featured === "true" ? true : false;
         const isAuthenticated = !!req.user;
 
         if (is_active === undefined) {
@@ -746,3 +751,4 @@ export const getFacultyByStatus = async (req, res) => {
         });
     }
 };
+

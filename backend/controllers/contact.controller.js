@@ -201,7 +201,6 @@ export const getContactsByType = async (req, res) => {
         message: inquiry.message,
         inquiry_type: inquiry.inquiry_type,
         status: inquiry.status,
-
         response: inquiry.response,
         responded_at: inquiry.responded_at,
         created_at: inquiry.created_at,

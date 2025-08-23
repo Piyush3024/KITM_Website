@@ -96,7 +96,6 @@ const deleteLimiter = rateLimit({
     }
 });
 
-// ============================= VALIDATION RULES =============================
 
 const validateUpload = [
     body("alt_text")
@@ -187,7 +186,6 @@ const validateBulkDelete = [
 ];
 
 const handleValidationErrors = (req, res, next) => {
-      console.log("Hello upload media")
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         console.warn(`Validation failed for ${req.method} ${req.path}:`, {

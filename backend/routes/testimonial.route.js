@@ -14,7 +14,8 @@ import {
     searchTestimonials,
     getTestimonialStatistics,
     toggleTestimonialStatus,
-    getTestimonialsByProgram
+    getTestimonialsByProgram,
+    checkSlugUniqueness
 } from "../controllers/testimonial.controller.js";
 import { protectRoute, authRateLimit, checkRole, checkAdmin } from "../middleware/auth.middleware.js";
 import { uploadTestimonial, validateFileTypes, organizeFiles, cleanupOnError } from "../middleware/multer.middleware.js";
@@ -305,6 +306,16 @@ const validateByProgram = [
         .withMessage("is_featured must be true or false"),
 ];
 
+const handleCheckSlugUniqueness = [
+    body("slug")
+        .optional()
+        .trim()
+        .isLength({ max: 255 })
+        .withMessage("Slug must be at most 255 characters")
+        .matches(/^[a-z0-9-]+$/i)
+        .withMessage("Slug can only contain letters, numbers, and hyphens"),
+]
+
 
 const handleValidationErrors = (req, res, next) => {
     const errors = validationResult(req);
@@ -342,6 +353,16 @@ router.post(
     handleValidationErrors,
     createTestimonial,
     cleanupOnError
+);
+
+
+router.get("/check-slug/:slug",
+ 
+    protectRoute,
+    checkAdmin,
+    handleCheckSlugUniqueness,
+    handleValidationErrors,
+    checkSlugUniqueness
 );
 
 router.get(

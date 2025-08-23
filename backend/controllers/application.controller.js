@@ -1,6 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import { encodeId, decodeId } from "../lib/secure.js";
-import { sendEmail, emailTemplates } from "../config/emailConfig.js";
+import { sendEmail, emailTemplates } from "../lib/emailConfig.js";
 import { handleLocalFileUploads, deleteFiles } from "../middleware/multer.middleware.js";
 
 const prisma = new PrismaClient();
@@ -107,8 +107,8 @@ export const createApplication = async (req, res) => {
           entrance_test_date: entrance_test_date ? new Date(entrance_test_date) : null,
           entrance_test_score: entrance_test_score ? parseFloat(entrance_test_score) : null,
           status,
-          declaration_agreed,
-          terms_agreed,
+          declaration_agreed: declaration_agreed === "true" ? true : false,
+          terms_agreed: terms_agreed === "true" ? true : false,
         },
       });
 
@@ -277,7 +277,6 @@ export const getApplicationById = async (req, res) => {
           select: {
             id: true,
             username: true,
-            full_name: true
           }
         }
       },
@@ -411,7 +410,6 @@ export const getAllApplications = async (req, res) => {
             select: {
               id: true,
               username: true,
-              full_name: true
             }
           }
         },

@@ -12,7 +12,8 @@ import {
     bulkUpdateSettings,
     deleteSetting,
     resetSettings,
-    getPublicSettings
+    getPublicSettings,
+    getSettingById
 } from "../controllers/settings.controller.js";
 import { protectRoute, authRateLimit, checkAdmin } from "../middleware/auth.middleware.js";
 import { uploadSingle, validateFileTypes, organizeFiles, cleanupOnError, setUploadEntity } from "../middleware/multer.middleware.js";
@@ -416,6 +417,15 @@ router.get(
     validateKey,
     handleValidationErrors,
     getSettingByKey
+);
+router.get(
+    "/:id",
+    moderateLimiter,
+    protectRoute,
+    checkAdmin,
+    // validateKey,
+    // handleValidationErrors,
+    getSettingById
 );
 
 // Update setting by ID (admin only)

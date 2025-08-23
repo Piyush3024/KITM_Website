@@ -16,10 +16,11 @@ import {
     removeItemsFromGallery,
     updateItemsOrder,
     updateItemCaption,
-    getGalleryItems
+    getGalleryItems,
+    checkSlugUniqueness
 } from "../controllers/galleries.controller.js";
 import { protectRoute, authRateLimit, checkAdmin } from "../middleware/auth.middleware.js";
-import { uploadSingle, validateFileTypes, organizeFiles, cleanupOnError, setUploadEntity } from "../middleware/multer.middleware.js";
+import { uploadSingle, validateFileTypes, organizeFiles, cleanupOnError, setUploadEntity, uploadAny } from "../middleware/multer.middleware.js";
 
 const router = express.Router();
 
@@ -67,7 +68,7 @@ const moderateLimiter = rateLimit({
     },
 });
 
-// ============================= VALIDATION RULES =============================
+
 
 const validateCreate = [
     body("title")
@@ -311,8 +312,17 @@ const validateUpdateCaption = [
         .isLength({ max: 500 })
         .withMessage("Caption must be at most 500 characters"),
 ];
-
+const handleCheckSlugUniqueness = [
+    body("slug")
+        .optional()
+        .trim()
+        .isLength({ max: 255 })
+        .withMessage("Slug must be at most 255 characters")
+        .matches(/^[a-z0-9-]+$/i)
+        .withMessage("Slug can only contain letters, numbers, and hyphens"),
+]
 const handleValidationErrors = (req, res, next) => {
+     console.log("Calling this function")
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
         console.warn(`Validation failed for ${req.method} ${req.path}:`, {
@@ -344,7 +354,7 @@ router.post(
     protectRoute,
     checkAdmin,
     setUploadEntity("galleries"),
-    uploadSingle("cover_image", "galleries"),
+    uploadAny("galleries"),
     organizeFiles,
     validateFileTypes,
     validateCreate,
@@ -359,6 +369,15 @@ router.get(
     validateSearch,
     handleValidationErrors,
     searchGalleries
+);
+
+router.get("/check-slug/:slug",
+ 
+    protectRoute,
+    checkAdmin,
+    handleCheckSlugUniqueness,
+    handleValidationErrors,
+    checkSlugUniqueness
 );
 
 router.get(

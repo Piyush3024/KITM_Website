@@ -43,9 +43,13 @@ export const createTestimonial = async (req, res) => {
             sort_order = 0,
         } = req.body;
 
+        const IsPublished = is_published === "true" ? true : false;
+        const IsFeatured = is_featured === "true" ? true : false;
+
+
         // Validate program_id if provided
 
-       const programId = decodeId(program_id)
+        const programId = decodeId(program_id)
         let validatedProgramName = program_name;
         if (programId) {
             const program = await prisma.programs.findUnique({
@@ -85,8 +89,8 @@ export const createTestimonial = async (req, res) => {
                 rating: rating ? parseInt(rating) : null,
                 student_image: uploadedFiles.student_image || null,
                 video_file: uploadedFiles.video_file || null,
-                is_published,
-                is_featured,
+                is_published: IsPublished,
+                is_featured: IsFeatured,
                 sort_order: parseInt(sort_order),
                 created_by: req.user ? parseInt(req.user.id) : null,
                 updated_by: req.user ? parseInt(req.user.id) : null,
@@ -358,6 +362,9 @@ export const updateTestimonial = async (req, res) => {
             sort_order,
         } = req.body;
         const decodedId = decodeId(id);
+        const IsPublished = is_published === "true" ? true : false;
+        const IsFeatured = is_featured === "true" ? true : false;
+
 
         const existingTestimonial = await prisma.testimonials.findUnique({
             where: { id: decodedId },
@@ -447,8 +454,8 @@ export const updateTestimonial = async (req, res) => {
             company,
             content,
             rating: rating ? parseInt(rating) : existingTestimonial.rating,
-            is_published,
-            is_featured,
+            is_published: IsPublished,
+            is_featured: IsFeatured,
             sort_order: sort_order ? parseInt(sort_order) : existingTestimonial.sort_order,
             updated_by: req.user ? parseInt(req.user.id) : existingTestimonial.updated_by,
             updated_at: new Date(),
@@ -873,6 +880,53 @@ export const getTestimonialsByProgram = async (req, res) => {
         res.status(500).json({
             success: false,
             message: "Error retrieving testimonials",
+            error: error.message,
+        });
+    }
+};
+
+
+export const checkSlugUniqueness = async (req, res) => {
+    try {
+
+        const { slug: providedSlug } = req.params;
+        const { excludeId: encodedTestimonialId } = req.query;
+
+        let slugToCheck = providedSlug;
+
+        // If no slug provided, generate from title
+
+        if (!slugToCheck) {
+            return res.status(400).json({
+                success: false,
+                message: "Slug  is required",
+            });
+        }
+
+        // Decode pageId if updating (to exclude current page from uniqueness check)
+        const decodedTestimonialId = encodedTestimonialId ? decodeId(encodedTestimonialId) : null;
+
+        // Check if any other page uses this slug
+        const existingTestimonial = await prisma.testimonials.findFirst({
+            where: {
+                slug: slugToCheck,
+                NOT: decodedTestimonialId ? { id: decodedTestimonialId } : undefined,
+            },
+        });
+
+        res.json({
+            success: true,
+            isUnique: !existingTestimonial,
+            slug: slugToCheck,
+            message: existingTestimonial
+                ? "Slug is already in use"
+                : "Slug is available",
+        });
+    } catch (error) {
+        console.error("Error in checkSlugUniqueness controller:", error);
+        res.status(500).json({
+            success: false,
+            message: "Error checking slug uniqueness",
             error: error.message,
         });
     }

@@ -10,7 +10,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import rateLimit from 'express-rate-limit';
-import slowDown from 'express-slow-down'; 
+import slowDown from 'express-slow-down';
 import { PrismaClient } from '@prisma/client';
 
 
@@ -29,6 +29,7 @@ import mediaRoutes from "./routes/media.route.js"
 import settingRoutes from "./routes/settings.route.js"
 import partnerRoutes from "./routes/partners.route.js"
 import applicationRoutes from "./routes/application.route.js"
+import userRoutes from "./routes/user.route.js"
 
 // Load environment variables
 dotenv.config();
@@ -73,7 +74,7 @@ const setupSecurity = () => {
     origin: function (origin, callback) {
       // Allow requests with no origin (mobile apps, Postman, etc.)
       if (!origin) return callback(null, true);
-      
+
       if (allowedOrigins.includes(origin)) {
         callback(null, true);
       } else {
@@ -84,8 +85,8 @@ const setupSecurity = () => {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
     allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
+      'Content-Type',
+      'Authorization',
       'X-Requested-With',
       'X-CSRF-Token',
       'X-API-Key'
@@ -94,6 +95,28 @@ const setupSecurity = () => {
   }));
 
   app.options('*', cors());
+  // Additional CORS for static files - more permissive for development
+  app.use('/uploads', (req, res, next) => {
+    const origin = req.headers.origin;
+
+    // Allow all localhost origins in development
+    if (!IS_PRODUCTION && origin && origin.includes('localhost')) {
+      res.header('Access-Control-Allow-Origin', origin);
+    } else {
+      res.header('Access-Control-Allow-Origin', '*');
+    }
+
+    res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control');
+    res.header('Access-Control-Allow-Credentials', 'false');
+
+    if (req.method === 'OPTIONS') {
+      res.status(200).end();
+      return;
+    }
+
+    next();
+  });
 };
 
 // Enhanced rate limiting setup
@@ -102,9 +125,9 @@ const setupRateLimiting = () => {
   const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
     max: IS_PRODUCTION ? 100 : 1000, // More permissive in development
-    message: { 
-      success: false, 
-      message: 'Too many requests from this IP, please try again later', 
+    message: {
+      success: false,
+      message: 'Too many requests from this IP, please try again later',
     },
     standardHeaders: true,
     legacyHeaders: false,
@@ -143,7 +166,7 @@ const setupMiddleware = () => {
   }));
 
   // Body parsing
-  app.use(express.json({ 
+  app.use(express.json({
     limit: '10mb',
     verify: (req, res, buf) => {
       try {
@@ -158,8 +181,8 @@ const setupMiddleware = () => {
     }
   }));
 
-  app.use(express.urlencoded({ 
-    extended: true, 
+  app.use(express.urlencoded({
+    extended: true,
     limit: '10mb',
     parameterLimit: 1000
   }));
@@ -183,15 +206,37 @@ const setupStaticFiles = async () => {
     console.log('Created uploads directory');
   }
 
-  // Serve static files with proper headers
+  // Serve static files with comprehensive headers
   app.use('/uploads', 
     express.static(uploadsDir, {
       maxAge: IS_PRODUCTION ? '7d' : '0',
       etag: true,
       lastModified: true,
-      setHeaders: (res, path) => {
-        if (path.endsWith('.pdf')) {
-          res.set('Content-Type', 'application/pdf');
+      setHeaders: (res, path, stat) => {
+        // Set CORS headers for all static files
+        res.set('Access-Control-Allow-Origin', '*');
+        res.set('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+        res.set('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+        
+        // Set proper content type based on file extension
+        const ext = path.toLowerCase().split('.').pop();
+        switch (ext) {
+          case 'jpg':
+          case 'jpeg':
+            res.set('Content-Type', 'image/jpeg');
+            break;
+          case 'png':
+            res.set('Content-Type', 'image/png');
+            break;
+          case 'gif':
+            res.set('Content-Type', 'image/gif');
+            break;
+          case 'webp':
+            res.set('Content-Type', 'image/webp');
+            break;
+          case 'pdf':
+            res.set('Content-Type', 'application/pdf');
+            break;
         }
       }
     })
@@ -212,10 +257,10 @@ const setupRoutes = () => {
       node_version: process.version,
       memory: process.memoryUsage(),
     };
-    
+
     res.status(200).json(healthCheck);
   });
-  
+
   // Root endpoint
   app.get('/', (req, res) => {
     res.json({
@@ -226,26 +271,27 @@ const setupRoutes = () => {
       documentation: process.env.API_DOCS_URL || '/api/docs'
     });
   });
-  
+
   // API routes - wrapped in try-catch to catch route definition errors
 
-    app.use('/api/auth', authRoutes);
-    app.use('/api/contacts', contactRoutes);
-    app.use('/api/programs', programRoutes);
-    app.use('/api/notices', noticeRoutes);
-    app.use('/api/events', eventRoutes);
-    app.use('/api/posts', postRoutes);
-    app.use('/api/pages', pagesRoutes);
-    app.use('/api/faculty', facultyRoutes);
-    app.use('/api/testimonials', testimonialRoutes);
-    app.use('/api/galleries', galleriesRoutes);
-    app.use('/api/media', mediaRoutes);
-    app.use('/api/settings', settingRoutes);
-    app.use('/api/partners', partnerRoutes);
-    app.use('/api/applications', applicationRoutes);
+  app.use('/api/auth', authRoutes);
+  app.use('/api/contacts', contactRoutes);
+  app.use('/api/programs', programRoutes);
+  app.use('/api/notices', noticeRoutes);
+  app.use('/api/events', eventRoutes);
+  app.use('/api/posts', postRoutes);
+  app.use('/api/pages', pagesRoutes);
+  app.use('/api/faculty', facultyRoutes);
+  app.use('/api/testimonials', testimonialRoutes);
+  app.use('/api/galleries', galleriesRoutes);
+  app.use('/api/media', mediaRoutes);
+  app.use('/api/settings', settingRoutes);
+  app.use('/api/partners', partnerRoutes);
+  app.use('/api/applications', applicationRoutes);
+  app.use('/api/users', userRoutes);
 
-  
-  
+
+
   // API not found handler (more specific than global 404)
   app.use('/api/*', (req, res) => {
     res.status(404).json({
@@ -316,13 +362,13 @@ const setupErrorHandling = () => {
 const setupGracefulShutdown = (server) => {
   const gracefulShutdown = (signal) => {
     console.log(`\nReceived ${signal}. Starting graceful shutdown...`);
-    
+
     server.close((err) => {
       if (err) {
         console.error('Error during server shutdown:', err);
         process.exit(1);
       }
-      
+
       console.log('Server closed successfully');
       process.exit(0);
     });
@@ -336,7 +382,7 @@ const setupGracefulShutdown = (server) => {
 
   process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
   process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-  
+
   // Handle unhandled promise rejections
   process.on('unhandledRejection', (reason, promise) => {
     console.error('Unhandled Rejection at:', promise, 'reason:', reason);
@@ -357,26 +403,42 @@ const setupGracefulShutdown = (server) => {
 async function startServer() {
   try {
     console.log('Starting KITM backend server...');
-    
+// Add this at the very beginning of startServer function
+app.use('/uploads', (req, res, next) => {
+  // Set comprehensive CORS headers
+  res.set({
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+    'Access-Control-Allow-Headers': 'Origin, X-Requested-With, Content-Type, Accept',
+    'Cross-Origin-Resource-Policy': 'cross-origin',
+    'Cross-Origin-Embedder-Policy': 'unsafe-none'
+  });
+  
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+  
+  next();
+});
     // Setup all middleware and configurations
     setupLogging();
     setupSecurity();
     setupRateLimiting();
     setupMiddleware();
-    
+
     // Setup static files
     await setupStaticFiles();
-    
+
     // Setup routes
     setupRoutes();
-    
+
     // Setup error handling (must be last)
     setupErrorHandling();
-    
+
     // Connect to database
     await prisma.$connect();
     console.log('Connected to database');
-    
+
     // Start server
     const server = app.listen(PORT, () => {
       console.log(`🚀 Server running on http://localhost:${PORT}`);
@@ -386,7 +448,7 @@ async function startServer() {
 
     // Setup graceful shutdown
     setupGracefulShutdown(server);
-    
+
   } catch (error) {
     console.error('❌ Unable to start server:', error);
     process.exit(1);

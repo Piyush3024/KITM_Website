@@ -20,6 +20,11 @@ export const createPartner = async (req, res) => {
             sort_order = 0,
         } = req.body;
 
+        const IsActive = is_active === "true" ? true : false;
+        const IsFeatured = is_featured === "true" ? true : false;
+        const sortOrder = parseInt(sort_order);
+
+
         // Handle logo upload
         let logoPath = null;
         if (req.file) {
@@ -55,9 +60,9 @@ export const createPartner = async (req, res) => {
                 contact_email,
                 contact_phone,
                 partnership_date: partnership_date ? new Date(partnership_date) : null,
-                is_active,
-                is_featured,
-                sort_order,
+                is_active: IsActive,
+                is_featured: IsFeatured,
+                sort_order: sortOrder,
             },
         });
 
@@ -70,7 +75,7 @@ export const createPartner = async (req, res) => {
             data: {
                 id: encodeId(partner.id),
                 company_name: partner.company_name,
-                logo: logoUrl,
+                logo: partner.logo ? generateFileUrl(req, partner.logo) : null,
                 website_url: partner.website_url,
                 partnership_type: partner.partnership_type,
                 description: partner.description,
@@ -96,7 +101,7 @@ export const createPartner = async (req, res) => {
 };
 
 export const getPartnerById = async (req, res) => {
-    try {
+    try {console.log("Get partnee by I di si s")
         const { id } = req.params;
         const decodedId = decodeId(id);
 
@@ -112,13 +117,13 @@ export const getPartnerById = async (req, res) => {
         }
 
         // Non-authenticated users can only see active partners
-        const isAuthenticated = !!req.user;
-        if (!isAuthenticated && !partner.is_active) {
-            return res.status(403).json({
-                success: false,
-                message: "Partner is not active",
-            });
-        }
+        // const isAuthenticated = !!req.user;
+        // if (!isAuthenticated ) {
+        //     return res.status(403).json({
+        //         success: false,
+        //         message: "Partner is not active",
+        //     });
+        // }
 
         res.json({
             success: true,
@@ -171,7 +176,7 @@ export const getAllPartners = async (req, res) => {
         if (partnership_type) where.partnership_type = partnership_type;
         if (is_active !== undefined) where.is_active = is_active === "true";
         if (is_featured !== undefined) where.is_featured = is_featured === "true";
-        
+
         // Non-authenticated users can only see active partners
         if (!isAuthenticated) where.is_active = true;
 
@@ -385,7 +390,7 @@ export const getPartnersByType = async (req, res) => {
         const where = { partnership_type };
         if (is_active !== undefined) where.is_active = is_active === "true";
         if (is_featured !== undefined) where.is_featured = is_featured === "true";
-        
+
         // Non-authenticated users can only see active partners
         if (!isAuthenticated) where.is_active = true;
 
@@ -454,6 +459,12 @@ export const updatePartner = async (req, res) => {
             sort_order,
         } = req.body;
 
+        const IsActive = is_active === "true" ? true : false;
+        const IsFeatured = is_featured === "true" ? true : false;
+        const sortOrder = parseInt(sort_order);
+
+
+
         const decodedId = decodeId(id);
 
         const existingPartner = await prisma.partners.findUnique({
@@ -469,7 +480,7 @@ export const updatePartner = async (req, res) => {
 
         // Handle logo upload with debugging
         let newLogoPath = null;
-        
+
         // Check if there's a single file upload
         if (req.file && req.file.fieldname === 'logo') {
             newLogoPath = req.file.path;
@@ -487,7 +498,7 @@ export const updatePartner = async (req, res) => {
                 }
             }
         }
-        
+
         // Fallback to handleLocalFileUploads if above didn't work
         if (!newLogoPath) {
             const uploadedFiles = handleLocalFileUploads(req);
@@ -506,9 +517,9 @@ export const updatePartner = async (req, res) => {
             contact_email,
             contact_phone,
             partnership_date: partnership_date ? new Date(partnership_date) : undefined,
-            is_active,
-            is_featured,
-            sort_order,
+            is_active: IsActive,
+            is_featured: IsFeatured,
+            sort_order: sortOrder,
             updated_at: new Date(),
         };
 
@@ -640,7 +651,7 @@ export const searchPartners = async (req, res) => {
         if (partnership_type) where.partnership_type = partnership_type;
         if (is_active !== undefined) where.is_active = is_active === "true";
         if (is_featured !== undefined) where.is_featured = is_featured === "true";
-        
+
         // Non-authenticated users can only see active partners
         if (!isAuthenticated) where.is_active = true;
 
